@@ -19,6 +19,14 @@ export type AdminPocket = {
   status: 'active' | 'pendingDeletion';
 };
 
+export type AdminPocketMember = {
+  displayName: string;
+  id: string;
+  joinedAt: string;
+  photoURL: string | null;
+  statusMessage: string;
+};
+
 export type AdminDashboardMetrics = {
   pocketWeeklyDelta: number;
   userWeeklyDelta: number;

@@ -13,6 +13,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import type {
   AdminDashboardMetrics,
   AdminPocket,
+  AdminPocketMember,
   AdminUser,
   DatabaseBackup,
   DatabaseBackupStatus,
@@ -20,6 +21,8 @@ import type {
   SupportInquiry,
   VersionNote,
 } from '../types/admin';
+
+export type DatabaseEnvironment = 'development' | 'production';
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -72,30 +75,59 @@ export async function logoutAdmin() {
   }
 }
 
-export async function loadAdminUsers(): Promise<AdminUser[]> {
-  const result = await callAdminFunction<{ users: AdminUser[] }>('listAdminUsers');
+export async function loadAdminUsers(
+  environment: DatabaseEnvironment = 'production',
+): Promise<AdminUser[]> {
+  const result = await callAdminFunction<{ users: AdminUser[] }>('listAdminUsers', {
+    environment,
+  });
   return result.users;
 }
 
-export async function loadAdminPockets(): Promise<AdminPocket[]> {
-  const result = await callAdminFunction<{ pockets: AdminPocket[] }>('listAdminPockets');
+export async function loadAdminPockets(
+  environment: DatabaseEnvironment = 'production',
+): Promise<AdminPocket[]> {
+  const result = await callAdminFunction<{ pockets: AdminPocket[] }>('listAdminPockets', {
+    environment,
+  });
   return result.pockets;
 }
 
-export async function loadAdminDashboardMetrics(): Promise<AdminDashboardMetrics> {
+export async function loadAdminPocketMembers(
+  pocketId: string,
+  environment: DatabaseEnvironment = 'production',
+): Promise<AdminPocketMember[]> {
+  const result = await callAdminFunction<{ members: AdminPocketMember[] }>(
+    'listAdminPocketMembers',
+    { environment, pocketId },
+  );
+  return result.members;
+}
+
+export async function loadAdminDashboardMetrics(
+  environment: DatabaseEnvironment = 'production',
+): Promise<AdminDashboardMetrics> {
   const result = await callAdminFunction<{ metrics: AdminDashboardMetrics }>(
     'getAdminDashboardMetrics',
+    { environment },
   );
   return result.metrics;
 }
 
-export async function loadAdminVersionNotes(): Promise<VersionNote[]> {
-  const result = await callAdminFunction<{ notes: VersionNote[] }>('listAdminVersionNotes');
+export async function loadAdminVersionNotes(
+  environment: DatabaseEnvironment = 'production',
+): Promise<VersionNote[]> {
+  const result = await callAdminFunction<{ notes: VersionNote[] }>('listAdminVersionNotes', {
+    environment,
+  });
   return result.notes;
 }
 
-export async function saveAdminVersionNote(note: VersionNote) {
-  await callAdminFunction('saveAdminVersionNote', note);
+export async function saveAdminVersionNote(
+  note: VersionNote,
+  environment: DatabaseEnvironment = 'production',
+) {
+  await callAdminFunction('saveAdminVersionNote', { ...note, environment });
 }
 
 export async function loadAdminSupportInquiries(): Promise<SupportInquiry[]> {
@@ -105,9 +137,12 @@ export async function loadAdminSupportInquiries(): Promise<SupportInquiry[]> {
   return result.inquiries;
 }
 
-export async function loadAdminDatabaseStatus(): Promise<DatabaseBackupStatus> {
+export async function loadAdminDatabaseStatus(
+  environment: DatabaseEnvironment = 'production',
+): Promise<DatabaseBackupStatus> {
   const result = await callAdminFunction<{ databaseStatus: DatabaseBackupStatus }>(
     'getAdminDatabaseStatus',
+    { environment },
   );
   return result.databaseStatus;
 }
@@ -117,6 +152,7 @@ export async function startAdminDatabaseRestore(
   databaseId: string,
   confirmText: string,
   secondConfirm: boolean,
+  environment: DatabaseEnvironment = 'production',
 ): Promise<DatabaseRestoreOperation> {
   const result = await callAdminFunction<{ restore: DatabaseRestoreOperation }>(
     'startAdminDatabaseRestore',
@@ -124,6 +160,7 @@ export async function startAdminDatabaseRestore(
       backupName: backup.name,
       confirmText,
       databaseId,
+      environment,
       secondConfirm,
     },
   );

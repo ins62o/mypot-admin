@@ -1022,11 +1022,11 @@ th {
 .tallPanel {
   display: flex;
   flex-direction: column;
-  min-height: 620px;
+  min-height: 0;
 }
 
 .dashboardTableWrap {
-  flex: 1;
+  flex: 0 0 auto;
 }
 
 .compactTable table {
@@ -1155,10 +1155,6 @@ tbody tr {
   padding-bottom: 22px;
 }
 
-#pockets tbody tr:last-child td {
-  border-bottom: 0;
-}
-
 .statTrend {
   color: #15876d;
 }
@@ -1179,17 +1175,38 @@ tbody tr {
   color: #b24d62;
 }
 
-/* Keep both dashboard tables visually filled at 10 rows */
+/* Keep dashboard rows sized to their content instead of stretching sparse data. */
 .dashboardTableWrap table {
-  height: 100%;
+  height: auto;
 }
 
 .dashboardTableWrap tbody tr {
-  height: 65px;
+  height: 64px;
 }
 
-#pockets .dashboardTableWrap {
-  padding-bottom: 0;
+.pocketMemberRow {
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.pocketMemberRow td {
+  transition: background 150ms ease;
+}
+
+.pocketMemberRow:hover td {
+  background: #fffaf0;
+}
+
+.pocketMemberRow:focus-visible {
+  outline: none;
+}
+
+.pocketMemberRow:focus-visible td {
+  background: #fff5dc;
+}
+
+.pocketMemberRow:focus-visible td:first-child {
+  box-shadow: inset 3px 0 0 #f6c84c;
 }
 
 #pockets td {
@@ -2023,6 +2040,171 @@ tbody tr {
   margin-bottom: 18px;
 }
 
+.pocketMembersBackdrop {
+  align-items: center;
+  background: rgba(62, 40, 21, 0.18);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 22px;
+  position: fixed;
+  z-index: 20;
+}
+
+.pocketMembersDialog {
+  background: #ffffff;
+  border: 1px solid #ead7b7;
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(62, 40, 21, 0.24);
+  max-width: 520px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.pocketMembersDialog .panelHeader {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.pocketMembersClose {
+  background: #fffdf7;
+  border: 1px solid #ead7b7;
+  border-radius: 8px;
+  color: #7a4d28;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 8px 11px;
+}
+
+.pocketMembersContent {
+  color: #76583a;
+  padding: 12px 18px 18px;
+}
+
+.pocketMembersList {
+  display: grid;
+}
+
+.pocketMemberItem {
+  align-items: center;
+  border-bottom: 1px solid #f5e8cc;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 12px 0;
+}
+
+.pocketMemberItem strong,
+.pocketMemberItem span,
+.pocketMemberItem small {
+  display: block;
+}
+
+.pocketMemberItem span,
+.pocketMemberItem small {
+  color: #8b7355;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.pocketMembersError {
+  color: #b24d62;
+}
+
+.databaseHeaderActions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.databaseEnvironmentSelect {
+  position: relative;
+}
+
+.databaseEnvironmentTrigger {
+  align-items: center;
+  background: #fffdf7;
+  border: 1px solid #ead7b7;
+  border-radius: 9px;
+  color: #5a371c;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 7px;
+  justify-content: space-between;
+  min-height: 34px;
+  min-width: 76px;
+  padding: 0 9px 0 11px;
+}
+
+.databaseEnvironmentTrigger:hover,
+.databaseEnvironmentTrigger[aria-expanded='true'] {
+  background: #fff8e9;
+  border-color: #d9b77c;
+}
+
+.databaseEnvironmentTrigger:focus-visible {
+  outline: 3px solid rgba(246, 200, 76, 0.32);
+  outline-offset: 2px;
+}
+
+.databaseEnvironmentTrigger svg {
+  transition: transform 160ms ease;
+}
+
+.databaseEnvironmentTrigger svg.open {
+  transform: rotate(180deg);
+}
+
+.databaseEnvironmentMenu {
+  background: #fffdf7;
+  border: 1px solid #ead7b7;
+  border-radius: 10px;
+  box-shadow: 0 12px 26px rgba(90, 55, 28, 0.14);
+  display: grid;
+  gap: 3px;
+  min-width: 112px;
+  padding: 5px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 5;
+}
+
+.databaseEnvironmentMenu button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  color: #76583a;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  justify-content: space-between;
+  min-height: 34px;
+  padding: 0 8px;
+  text-align: left;
+}
+
+.databaseEnvironmentMenu button:hover,
+.databaseEnvironmentMenu button.selected {
+  background: #fff1cf;
+  color: #5a371c;
+}
+
+.databaseEnvironmentMenu button svg {
+  color: #d18a20;
+}
+
 .databaseStatusGrid {
   display: grid;
   gap: 10px;
@@ -2440,6 +2622,56 @@ tbody tr {
 .releaseTypeTag.patch {
   background: #fff3c4;
   color: #94690e;
+}
+
+.versionSaveBackdrop {
+  align-items: center;
+  background: rgba(62, 40, 21, 0.18);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 22px;
+  position: fixed;
+  z-index: 20;
+}
+
+.versionSaveDialog {
+  background: #ffffff;
+  border: 1px solid #ead7b7;
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(62, 40, 21, 0.2);
+  max-width: 350px;
+  padding: 28px;
+  text-align: center;
+  width: 100%;
+}
+
+.versionSaveDialog .eyebrow {
+  margin-bottom: 6px;
+}
+
+.versionSaveDialog h2 {
+  color: #5a371c;
+  font-size: 20px;
+  margin: 0;
+}
+
+.versionSaveDialog p:not(.eyebrow) {
+  color: #8b7355;
+  font-size: 14px;
+  margin: 10px 0 22px;
+}
+
+.versionSaveDialog button {
+  background: #f6c84c;
+  border: 1px solid #dfae2a;
+  border-radius: 9px;
+  color: #5a371c;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+  min-width: 108px;
+  padding: 10px 16px;
 }
 
 .releaseLegend {

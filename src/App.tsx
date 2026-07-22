@@ -1,5 +1,7 @@
-﻿import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
+  Check,
+  ChevronDown,
   Database,
   FileText,
   Inbox,
@@ -14,13 +16,14 @@ import appleLogo from './assets/social/apple-login.svg';
 import kakaoLogo from './assets/social/kakao-login.svg';
 import { AdminSearch } from './components/AdminSearch';
 import { StatCard } from './components/StatCard';
-import type { AdminDashboardMetrics, AdminPocket, AdminUser, DatabaseBackup, DatabaseBackupStatus, SupportInquiry, VersionNote, VersionReleaseType } from './types/admin';
+import type { AdminDashboardMetrics, AdminPocket, AdminPocketMember, AdminUser, DatabaseBackup, DatabaseBackupStatus, SupportInquiry, VersionNote, VersionReleaseType } from './types/admin';
 import {
   answerSupportInquiry as answerSupportInquiryRemote,
   isFirebaseConfigured,
   loadAdminDashboardMetrics,
   loadAdminDatabaseStatus,
   loadAdminPockets,
+  loadAdminPocketMembers,
   loadAdminSupportInquiries,
   loadAdminUsers,
   loadAdminVersionNotes,
@@ -29,10 +32,12 @@ import {
   saveAdminVersionNote,
   startAdminDatabaseRestore,
   subscribeToAdminSession,
+  type DatabaseEnvironment,
 } from './services/firebaseAdminClient';
 import './styles.css';
 
 const PAGE_SIZE = 10;
+const DATABASE_ENVIRONMENT_STORAGE_KEY = 'mypot-admin-database-environment';
 
 type AdminPage = 'dashboard' | 'database' | 'versions' | 'support';
 type PocketSortKey = 'memberCount' | 'recordCount' | 'level' | 'status';
@@ -77,9 +82,20 @@ function App() {
   const [databaseDataSourceStatus, setDatabaseDataSourceStatus] =
     useState<DataSourceStatus>('loading');
   const [databaseStatusMessage, setDatabaseStatusMessage] =
-    useState('운영 Firebase DB 연결 대기 중');
+    useState('연결 중');
   const [databaseBackupStatus, setDatabaseBackupStatus] =
     useState<DatabaseBackupStatus | null>(null);
+  const [databaseEnvironment, setDatabaseEnvironment] =
+    useState<DatabaseEnvironment>(() => {
+      try {
+        const savedEnvironment = window.localStorage.getItem(
+          DATABASE_ENVIRONMENT_STORAGE_KEY,
+        );
+        return savedEnvironment === 'development' ? 'development' : 'production';
+      } catch {
+        return 'production';
+      }
+    });
   const [dashboardMetrics, setDashboardMetrics] =
     useState<AdminDashboardMetrics>({ pocketWeeklyDelta: 0, userWeeklyDelta: 0 });
   const [selectedVersionId, setSelectedVersionId] = useState('');
@@ -111,19 +127,16 @@ function App() {
     }
 
     let isMounted = true;
+    const environmentLabel = databaseEnvironment === 'production' ? '운영' : '개발';
     setDataSourceStatus('loading');
-    setFirebaseStatusMessage('운영 Firebase 데이터 불러오는 중');
-    setDatabaseDataSourceStatus('loading');
-    setDatabaseStatusMessage('운영 Firebase DB 현황 불러오는 중');
-
+    setFirebaseStatusMessage(`${environmentLabel} Firebase 데이터 불러오는 중`);
     Promise.allSettled([
-      loadAdminUsers(),
-      loadAdminPockets(),
-      loadAdminVersionNotes(),
+      loadAdminUsers(databaseEnvironment),
+      loadAdminPockets(databaseEnvironment),
+      loadAdminVersionNotes(databaseEnvironment),
       loadAdminSupportInquiries(),
-      loadAdminDatabaseStatus(),
-      loadAdminDashboardMetrics(),
-    ]).then(([loadedUsers, loadedPockets, loadedNotes, loadedInquiries, loadedDatabase, loadedMetrics]) => {
+      loadAdminDashboardMetrics(databaseEnvironment),
+    ]).then(([loadedUsers, loadedPockets, loadedNotes, loadedInquiries, loadedMetrics]) => {
       if (!isMounted) {
         return;
       }
@@ -143,15 +156,6 @@ function App() {
           loadedInquiries.value.filter((inquiry) => inquiry.status === 'waiting'),
         );
       }
-      if (loadedDatabase.status === 'fulfilled') {
-        setDatabaseBackupStatus(loadedDatabase.value);
-        setDatabaseDataSourceStatus('firebase');
-        setDatabaseStatusMessage('운영 Firebase 연결됨');
-      } else {
-        setDatabaseBackupStatus(null);
-        setDatabaseDataSourceStatus('error');
-        setDatabaseStatusMessage('운영 Firebase DB 연결 실패');
-      }
       if (loadedMetrics.status === 'fulfilled') {
         setDashboardMetrics(loadedMetrics.value);
       }
@@ -163,18 +167,55 @@ function App() {
         setUsers([]);
         setPockets([]);
         setDataSourceStatus('error');
-        setFirebaseStatusMessage('운영 Firebase 데이터 호출 실패');
+        setFirebaseStatusMessage(`${environmentLabel} Firebase 데이터 호출 실패`);
         return;
       }
 
       setDataSourceStatus('firebase');
-      setFirebaseStatusMessage('운영 Firebase 연결됨');
+      setFirebaseStatusMessage(`${environmentLabel} Firebase 연결됨`);
     });
 
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated]);
+  }, [databaseEnvironment, isAuthenticated]);
+
+  function handleDatabaseEnvironmentChange(environment: DatabaseEnvironment) {
+    setDatabaseEnvironment(environment);
+    try {
+      window.localStorage.setItem(DATABASE_ENVIRONMENT_STORAGE_KEY, environment);
+    } catch {
+      // 환경 선택은 브라우저 저장소를 사용할 수 없어도 현재 세션에서 유지됩니다.
+    }
+  }
+
+  useEffect(() => {
+    if (!isAuthenticated || !isFirebaseConfigured) {
+      return;
+    }
+
+    let isMounted = true;
+    setDatabaseBackupStatus(null);
+    setDatabaseDataSourceStatus('loading');
+    setDatabaseStatusMessage('연결 중');
+
+    loadAdminDatabaseStatus(databaseEnvironment)
+      .then((databaseStatus) => {
+        if (!isMounted) return;
+        setDatabaseBackupStatus(databaseStatus);
+        setDatabaseDataSourceStatus('firebase');
+        setDatabaseStatusMessage('연결');
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setDatabaseDataSourceStatus('error');
+        setDatabaseStatusMessage('연결 실패');
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [databaseEnvironment, isAuthenticated]);
 
   async function handleLoginSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -309,7 +350,9 @@ function App() {
           <DashboardPage
             activePocketCount={activePocketCount}
             dataSourceStatus={dataSourceStatus}
+            environment={databaseEnvironment}
             firebaseStatusMessage={firebaseStatusMessage}
+            onLoadPocketMembers={loadAdminPocketMembers}
             pendingDeletionPocketCount={pendingDeletionPocketCount}
             pockets={pockets}
             pocketWeeklyDelta={dashboardMetrics.pocketWeeklyDelta}
@@ -322,15 +365,18 @@ function App() {
           <DatabaseStatusPage
             databaseBackupStatus={databaseBackupStatus}
             dataSourceStatus={databaseDataSourceStatus}
+            environment={databaseEnvironment}
             firebaseStatusMessage={databaseStatusMessage}
+            onEnvironmentChange={handleDatabaseEnvironmentChange}
           />
         ) : null}
 
         {page === 'versions' ? (
           <VersionNotesPage
+            environment={databaseEnvironment}
             notes={versionNotes}
             onChangeNotes={setVersionNotes}
-            onSaveNote={saveAdminVersionNote}
+            onSaveNote={(note) => saveAdminVersionNote(note, databaseEnvironment)}
             onSelectNote={setSelectedVersionId}
             selectedNote={selectedVersion}
           />
@@ -356,7 +402,12 @@ function App() {
 type DashboardPageProps = {
   activePocketCount: number;
   dataSourceStatus: DataSourceStatus;
+  environment: DatabaseEnvironment;
   firebaseStatusMessage: string;
+  onLoadPocketMembers: (
+    pocketId: string,
+    environment: DatabaseEnvironment,
+  ) => Promise<AdminPocketMember[]>;
   pendingDeletionPocketCount: number;
   pockets: AdminPocket[];
   pocketWeeklyDelta: number;
@@ -367,7 +418,9 @@ type DashboardPageProps = {
 function DashboardPage({
   activePocketCount,
   dataSourceStatus,
+  environment,
   firebaseStatusMessage,
+  onLoadPocketMembers,
   pendingDeletionPocketCount,
   pockets,
   pocketWeeklyDelta,
@@ -379,6 +432,10 @@ function DashboardPage({
   const [pocketPage, setPocketPage] = useState(1);
   const [pocketSortKey, setPocketSortKey] =
     useState<PocketSortKey>('memberCount');
+  const [selectedPocket, setSelectedPocket] = useState<AdminPocket | null>(null);
+  const [pocketMembers, setPocketMembers] = useState<AdminPocketMember[]>([]);
+  const [isLoadingPocketMembers, setIsLoadingPocketMembers] = useState(false);
+  const [pocketMembersError, setPocketMembersError] = useState('');
 
   const filteredUsers = useMemo(() => {
     const normalizedQuery = userQuery.trim().toLowerCase();
@@ -418,6 +475,21 @@ function DashboardPage({
   function updatePocketSort(nextSortKey: PocketSortKey) {
     setPocketSortKey(nextSortKey);
     setPocketPage(1);
+  }
+
+  async function openPocketMembers(pocket: AdminPocket) {
+    setSelectedPocket(pocket);
+    setPocketMembers([]);
+    setPocketMembersError('');
+    setIsLoadingPocketMembers(true);
+
+    try {
+      setPocketMembers(await onLoadPocketMembers(pocket.id, environment));
+    } catch {
+      setPocketMembersError('참여자 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setIsLoadingPocketMembers(false);
+    }
   }
 
   return (
@@ -540,7 +612,20 @@ function DashboardPage({
               </thead>
               <tbody>
                 {visiblePockets.map((pocketItem) => (
-                  <tr key={pocketItem.id}>
+                  <tr
+                    aria-label={`${pocketItem.name} 참여자 보기`}
+                    className="pocketMemberRow"
+                    key={pocketItem.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openPocketMembers(pocketItem)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openPocketMembers(pocketItem);
+                      }
+                    }}
+                  >
                     <td>
                       <strong>{pocketItem.name}</strong>
                       <small className="tableSubText">{pocketItem.id}</small>
@@ -573,6 +658,53 @@ function DashboardPage({
           />
         </article>
       </section>
+
+      {selectedPocket ? (
+        <div className="pocketMembersBackdrop" role="presentation">
+          <section
+            aria-labelledby="pocket-members-title"
+            aria-modal="true"
+            className="pocketMembersDialog"
+            role="dialog"
+          >
+            <div className="panelHeader compact">
+              <div>
+                <p className="eyebrow">Members</p>
+                <h2 id="pocket-members-title">{selectedPocket.name} 참여자</h2>
+              </div>
+              <button
+                className="pocketMembersClose"
+                type="button"
+                onClick={() => setSelectedPocket(null)}
+              >
+                닫기
+              </button>
+            </div>
+            <div className="pocketMembersContent">
+              {isLoadingPocketMembers ? <p>참여자 목록을 불러오는 중이에요.</p> : null}
+              {pocketMembersError ? <p className="pocketMembersError">{pocketMembersError}</p> : null}
+              {!isLoadingPocketMembers && !pocketMembersError ? (
+                <div className="pocketMembersList">
+                  {pocketMembers.map((member) => (
+                    <div className="pocketMemberItem" key={member.id}>
+                      <UserAvatar
+                        displayName={member.displayName}
+                        photoURL={member.photoURL}
+                      />
+                      <div>
+                        <strong>{member.displayName}</strong>
+                        <span>{member.statusMessage || '상태 메시지가 없어요.'}</span>
+                      </div>
+                      <small>{member.joinedAt} 참여</small>
+                    </div>
+                  ))}
+                  {pocketMembers.length === 0 ? <p>참여자가 없어요.</p> : null}
+                </div>
+              ) : null}
+            </div>
+          </section>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -580,13 +712,17 @@ function DashboardPage({
 type DatabaseStatusPageProps = {
   databaseBackupStatus: DatabaseBackupStatus | null;
   dataSourceStatus: DataSourceStatus;
+  environment: DatabaseEnvironment;
   firebaseStatusMessage: string;
+  onEnvironmentChange: (environment: DatabaseEnvironment) => void;
 };
 
 function DatabaseStatusPage({
   databaseBackupStatus,
   dataSourceStatus,
+  environment,
   firebaseStatusMessage,
+  onEnvironmentChange,
 }: DatabaseStatusPageProps) {
   const [restoreMessage, setRestoreMessage] = useState('');
   const [restoreBackup, setRestoreBackup] = useState<DatabaseBackup | null>(null);
@@ -595,6 +731,14 @@ function DatabaseStatusPage({
   const [restoreSecondConfirm, setRestoreSecondConfirm] = useState(false);
   const [restoreError, setRestoreError] = useState('');
   const [isRestoring, setIsRestoring] = useState(false);
+  const [isEnvironmentMenuOpen, setIsEnvironmentMenuOpen] = useState(false);
+
+  const environmentLabel = environment === 'production' ? '운영' : '개발';
+
+  function selectEnvironment(nextEnvironment: DatabaseEnvironment) {
+    setIsEnvironmentMenuOpen(false);
+    onEnvironmentChange(nextEnvironment);
+  }
 
   function openRestoreDialog(backup: DatabaseBackup) {
     setRestoreBackup(backup);
@@ -631,6 +775,7 @@ function DatabaseStatusPage({
         restoreDatabaseId.trim(),
         restoreConfirmText.trim(),
         restoreSecondConfirm,
+        environment,
       );
       setRestoreMessage(
         `${operation.databaseId} 새 DB 복원 작업을 시작했어요. 작업 ID: ${operation.operationName}`,
@@ -651,12 +796,57 @@ function DatabaseStatusPage({
         <div className="panelHeader compact">
           <div>
             <p className="eyebrow">Database</p>
-            <h2>운영 DB 현황</h2>
+            <h2>{environmentLabel} DB 현황</h2>
           </div>
-          <span className={`dataSourcePill ${dataSourceStatus}`}>
-            <i aria-hidden="true" />
-            {firebaseStatusMessage}
-          </span>
+          <div className="databaseHeaderActions">
+            <div className="databaseEnvironmentSelect">
+              <button
+                aria-controls="database-environment-menu"
+                aria-expanded={isEnvironmentMenuOpen}
+                className="databaseEnvironmentTrigger"
+                type="button"
+                onClick={() => setIsEnvironmentMenuOpen((isOpen) => !isOpen)}
+              >
+                <span>{environmentLabel}</span>
+                <ChevronDown
+                  aria-hidden="true"
+                  className={isEnvironmentMenuOpen ? 'open' : ''}
+                  size={16}
+                />
+              </button>
+              {isEnvironmentMenuOpen ? (
+                <div
+                  aria-label="DB 환경 선택"
+                  className="databaseEnvironmentMenu"
+                  id="database-environment-menu"
+                  role="menu"
+                >
+                  {(['production', 'development'] as const).map((option) => {
+                    const label = option === 'production' ? '운영' : '개발';
+                    const isSelected = option === environment;
+
+                    return (
+                      <button
+                        aria-checked={isSelected}
+                        className={isSelected ? 'selected' : ''}
+                        key={option}
+                        role="menuitemradio"
+                        type="button"
+                        onClick={() => selectEnvironment(option)}
+                      >
+                        <span>{label}</span>
+                        {isSelected ? <Check aria-hidden="true" size={15} /> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+            <span className={`dataSourcePill ${dataSourceStatus}`}>
+              <i aria-hidden="true" />
+              {firebaseStatusMessage}
+            </span>
+          </div>
         </div>
 
         {databaseBackupStatus ? (
@@ -692,10 +882,10 @@ function DatabaseStatusPage({
               <strong>복원 기능</strong>
               <p>
                 그때로 돌아가는 건 가능하지만, 안전한 방식은 먼저 새 DB로
-                복원하고 확인한 뒤 운영 전환하는 것입니다.
+                복원하고 확인한 뒤 {environmentLabel} 환경에서 검증하는 것입니다.
               </p>
               <small>
-                백업 복원은 운영 DB를 바로 덮어쓰지 않고 선택한 백업 시점의
+                백업 복원은 {environmentLabel} DB를 바로 덮어쓰지 않고 선택한 백업 시점의
                 새 Firestore DB를 생성합니다. PITR 날짜 복원은 가장 이른 복구
                 시각 이후의 분 단위 시각으로 새 DB clone/export 방식이 가능합니다.
               </small>
@@ -762,7 +952,7 @@ function DatabaseStatusPage({
           </>
         ) : (
           <div className="databaseLoadingState">
-            운영 Firebase DB 현황을 불러오는 중이에요.
+            {environmentLabel} Firebase DB 현황을 불러오는 중이에요.
           </div>
         )}
       </article>
@@ -779,7 +969,7 @@ function DatabaseStatusPage({
             <div className="restoreImpactNotice">
               <strong>{restoreBackup.snapshotTime} 백업 기준</strong>
               <p>
-                이 작업은 운영 DB를 즉시 되돌리지 않습니다. 선택한 백업 시점의
+                이 작업은 {environmentLabel} DB를 즉시 되돌리지 않습니다. 선택한 백업 시점의
                 데이터로 새 Firestore DB를 만들고, 복원된 DB를 확인한 뒤 운영
                 전환이나 데이터 이관을 따로 결정해야 합니다.
               </p>
@@ -892,6 +1082,7 @@ const releaseTypeLabel: Record<VersionReleaseType, string> = {
 };
 
 type VersionNotesPageProps = {
+  environment: DatabaseEnvironment;
   notes: VersionNote[];
   onChangeNotes: (notes: VersionNote[]) => void;
   onSaveNote: (note: VersionNote) => Promise<void> | void;
@@ -900,6 +1091,7 @@ type VersionNotesPageProps = {
 };
 
 function VersionNotesPage({
+  environment,
   notes,
   onChangeNotes,
   onSaveNote,
@@ -907,6 +1099,9 @@ function VersionNotesPage({
   selectedNote,
 }: VersionNotesPageProps) {
   const [saveMessage, setSaveMessage] = useState('');
+  const [savedVersionNote, setSavedVersionNote] = useState<VersionNote | null>(null);
+  const [isSavingVersionNote, setIsSavingVersionNote] = useState(false);
+  const environmentLabel = environment === 'production' ? '운영' : '개발';
 
   function updateSelectedNote(nextNote: VersionNote) {
     if (!selectedNote) {
@@ -932,7 +1127,7 @@ function VersionNotesPage({
           description: '앱에 반영할 변경 내용을 입력해 주세요.',
         },
       ],
-      releaseType: 'patch',
+      releaseType: notes.length === 0 ? 'major' : 'patch',
       status: 'draft',
     };
 
@@ -942,7 +1137,7 @@ function VersionNotesPage({
   }
 
   async function saveVersionNote() {
-    if (!selectedNote) {
+    if (!selectedNote || isSavingVersionNote) {
       return;
     }
 
@@ -953,13 +1148,21 @@ function VersionNotesPage({
       status: 'published' as const,
     };
 
-    onChangeNotes(
-      notes
-        .map((note) => (note.id === selectedNote.id ? noteToSave : note))
-        .sort(compareVersionNotes),
-    );
-    await onSaveNote(noteToSave);
-    setSaveMessage(`${selectedNote.version} 저장 완료 · ${releaseTypeLabel[releaseType]}`);
+    try {
+      setIsSavingVersionNote(true);
+      await onSaveNote(noteToSave);
+      onChangeNotes(
+        notes
+          .map((note) => (note.id === selectedNote.id ? noteToSave : note))
+          .sort(compareVersionNotes),
+      );
+      setSaveMessage(`${selectedNote.version} 저장 완료 · ${releaseTypeLabel[releaseType]}`);
+      setSavedVersionNote(noteToSave);
+    } catch {
+      setSaveMessage('저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setIsSavingVersionNote(false);
+    }
   }
 
   function updatePatch(
@@ -1014,7 +1217,7 @@ function VersionNotesPage({
         <div className="panelHeader compact versionHistoryHeader">
           <div>
             <p className="eyebrow">History</p>
-            <h2>이전 버전 노트</h2>
+            <h2>{environmentLabel} 이전 버전 노트</h2>
           </div>
           <button type="button" onClick={createVersionNote}>
             새 노트 작성
@@ -1059,8 +1262,8 @@ function VersionNotesPage({
           </div>
           <div className="versionHeaderActions">
             {saveMessage ? <span>{saveMessage}</span> : null}
-            <button type="button" onClick={saveVersionNote}>
-              저장
+            <button disabled={isSavingVersionNote} type="button" onClick={saveVersionNote}>
+              {isSavingVersionNote ? '저장 중' : '저장'}
             </button>
           </div>
         </div>
@@ -1184,6 +1387,25 @@ function VersionNotesPage({
       ) : (
         <article className="panel appPatchPreviewPanel emptyState">데이터 없음</article>
       )}
+      {savedVersionNote ? (
+        <div className="versionSaveBackdrop" role="presentation">
+          <section
+            aria-labelledby="version-save-title"
+            aria-modal="true"
+            className="versionSaveDialog"
+            role="dialog"
+          >
+            <p className="eyebrow">Saved</p>
+            <h2 id="version-save-title">버전 노트를 저장했어요</h2>
+            <p>
+              {savedVersionNote.version} · {releaseTypeLabel[savedVersionNote.releaseType]}
+            </p>
+            <button type="button" onClick={() => setSavedVersionNote(null)}>
+              확인
+            </button>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -1428,7 +1650,7 @@ function detectReleaseType(
     .sort(compareVersionNotes)[0];
 
   if (!previousNote) {
-    return 'patch';
+    return 'major';
   }
 
   const previous = parseVersion(previousNote.version);
@@ -1473,13 +1695,6 @@ function StatusBadge({ status }: { status: BadgeStatus }) {
 }
 
 export default App;
-
-
-
-
-
-
-
 
 
 
