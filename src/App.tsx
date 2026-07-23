@@ -137,7 +137,7 @@ function App() {
       loadAdminUsers(databaseEnvironment),
       loadAdminPockets(databaseEnvironment),
       loadAdminVersionNotes(databaseEnvironment),
-      loadAdminSupportInquiries(),
+      loadAdminSupportInquiries(databaseEnvironment),
       loadAdminDashboardMetrics(databaseEnvironment),
     ]).then(([loadedUsers, loadedPockets, loadedNotes, loadedInquiries, loadedMetrics]) => {
       if (!isMounted) {
@@ -408,7 +408,7 @@ function App() {
           <SupportPage
             inquiries={supportInquiries}
             onAnswerInquiry={async (inquiry, answer) => {
-              await answerSupportInquiryRemote(inquiry, answer);
+              await answerSupportInquiryRemote(inquiry, answer, databaseEnvironment);
               setSupportInquiries((currentInquiries) =>
                 currentInquiries.filter((item) => item.id !== inquiry.id),
               );
@@ -1560,6 +1560,8 @@ function SupportPage({
   const selectedInquiry =
     inquiries.find((inquiry) => inquiry.id === selectedInquiryId) ?? inquiries[0];
   const [answerText, setAnswerText] = useState(selectedInquiry?.answer ?? '');
+  const [isAnswerConfirmOpen, setIsAnswerConfirmOpen] = useState(false);
+  const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
 
   useEffect(() => {
     setAnswerText(selectedInquiry?.answer ?? '');
@@ -1572,7 +1574,21 @@ function SupportPage({
       return;
     }
 
-    onAnswerInquiry(selectedInquiry, answerText.trim());
+    setIsAnswerConfirmOpen(true);
+  }
+
+  async function confirmAnswer() {
+    if (!selectedInquiry || !answerText.trim() || isSubmittingAnswer) {
+      return;
+    }
+
+    try {
+      setIsSubmittingAnswer(true);
+      await onAnswerInquiry(selectedInquiry, answerText.trim());
+      setIsAnswerConfirmOpen(false);
+    } finally {
+      setIsSubmittingAnswer(false);
+    }
   }
 
   return (
@@ -1699,6 +1715,38 @@ function SupportPage({
       ) : (
         <article className="panel emptyState">데이터 없음</article>
       )}
+      {isAnswerConfirmOpen && selectedInquiry ? (
+        <div className="supportAnswerBackdrop" role="presentation">
+          <section
+            aria-labelledby="support-answer-confirm-title"
+            aria-modal="true"
+            className="supportAnswerDialog"
+            role="dialog"
+          >
+            <h2 id="support-answer-confirm-title">답변을 완료할까요?</h2>
+            <p>{selectedInquiry.userName}님에게 답변이 전달됩니다.</p>
+            <div className="supportAnswerDialogActions">
+              <button
+                disabled={isSubmittingAnswer}
+                type="button"
+                onClick={() => setIsAnswerConfirmOpen(false)}
+              >
+                취소
+              </button>
+              <button disabled={isSubmittingAnswer} type="button" onClick={confirmAnswer}>
+                {isSubmittingAnswer ? (
+                  <>
+                    <LoaderCircle aria-hidden="true" className="buttonSpinner" size={18} />
+                    <span className="srOnly">답변 저장 중</span>
+                  </>
+                ) : (
+                  '답변 완료'
+                )}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }

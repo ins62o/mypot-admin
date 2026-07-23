@@ -2970,3 +2970,65 @@ tbody tr {
     transform: rotate(360deg);
   }
 }
+.supportAnswerBackdrop {
+  align-items: center;
+  background: rgba(62, 40, 21, 0.18);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 22px;
+  position: fixed;
+  z-index: 20;
+}
+
+.supportAnswerDialog {
+  background: #ffffff;
+  border: 1px solid #ead7b7;
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(62, 40, 21, 0.2);
+  max-width: 350px;
+  padding: 28px;
+  text-align: center;
+  width: 100%;
+}
+
+.supportAnswerDialog h2 {
+  color: #5a371c;
+  font-size: 20px;
+  margin: 0;
+}
+
+.supportAnswerDialog p {
+  color: #8b7355;
+  font-size: 14px;
+  margin: 10px 0 22px;
+}
+
+.supportAnswerDialogActions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.supportAnswerDialogActions button {
+  align-items: center;
+  border-radius: 9px;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 900;
+  justify-content: center;
+  padding: 10px 16px;
+}
+
+.supportAnswerDialogActions button:first-child {
+  background: #ffffff;
+  border: 1px solid #ead7b7;
+  color: #7a4d28;
+}
+
+.supportAnswerDialogActions button:last-child {
+  background: #f6c84c;
+  border: 1px solid #dfae2a;
+  color: #5a371c;
+}

@@ -137,9 +137,12 @@ export async function deleteAdminVersionNote(
   await callAdminFunction('deleteAdminVersionNote', { environment, noteId });
 }
 
-export async function loadAdminSupportInquiries(): Promise<SupportInquiry[]> {
+export async function loadAdminSupportInquiries(
+  environment: DatabaseEnvironment = 'production',
+): Promise<SupportInquiry[]> {
   const result = await callAdminFunction<{ inquiries: SupportInquiry[] }>(
     'listAdminSupportInquiries',
+    { environment },
   );
   return result.inquiries;
 }
@@ -174,13 +177,18 @@ export async function startAdminDatabaseRestore(
   return result.restore;
 }
 
-export async function answerSupportInquiry(inquiry: SupportInquiry, answer: string) {
+export async function answerSupportInquiry(
+  inquiry: SupportInquiry,
+  answer: string,
+  environment: DatabaseEnvironment = 'production',
+) {
   if (!inquiry.userId) {
     throw new Error('문의 사용자 ID가 없어 Firebase에 답변을 저장할 수 없어요.');
   }
 
   await callAdminFunction('answerSupportInquiry', {
     answer,
+    environment,
     inquiryId: inquiry.id,
     userId: inquiry.userId,
   });
