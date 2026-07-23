@@ -1,4 +1,4 @@
-﻿@font-face {
+@font-face {
   font-family: "Pretendard";
   src: url("./assets/fonts/PretendardVariable.woff2") format("woff2");
   font-weight: 45 920;
@@ -169,8 +169,8 @@ button {
 }
 
 .sidebar {
-  background: #fffdf7;
-  border-right: 1px solid #ead7b7;
+  background: #fffaf0;
+  border-right: 1px solid #f1dfb8;
   display: flex;
   flex-direction: column;
   gap: 28px;
@@ -184,7 +184,7 @@ button {
   align-items: center;
   display: flex;
   gap: 12px;
-  padding: 8px 6px 18px;
+  padding: 8px 6px 10px;
 }
 
 .brandMark,
@@ -223,41 +223,79 @@ button {
 
 .navList {
   display: grid;
-  gap: 6px;
+  gap: 12px;
 }
 
-.navList button,
-.navList a {
+.navGroup {
+  background: #ffffff;
+  border: 1px solid #f0dfb9;
+  border-radius: 16px;
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+}
+
+.navGroupSystem {
+  background: #ffffff;
+}
+
+.navGroupLabel {
+  color: #aa7b32;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 18px;
+  margin: 0 4px 4px;
+}
+
+.navList button {
   align-items: center;
+  background: transparent;
+  border: 0;
   border-radius: 10px;
-  color: #7a4d28;
+  color: #755126;
   display: flex;
   font-weight: 700;
   gap: 10px;
-  padding: 11px 12px;
-  text-decoration: none;
+  min-height: 44px;
+  padding: 7px 8px;
+  position: relative;
+  text-align: left;
+  transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+  width: 100%;
 }
 
-.navList button.active,
-.navList button:hover,
-.navList a.active,
-.navList a:hover {
-  background: #fff3c4;
+.navList button:hover {
+  background: #fff2c9;
   color: #5a371c;
 }
 
+.navList button.active {
+  background: #ffc437;
+  box-shadow: 0 5px 12px rgba(223, 174, 42, 0.24);
+  color: #563416;
+}
 
-.navList button {
-  background: transparent;
-  border: 0;
-  position: relative;
-  text-align: left;
-  width: 100%;
+.navIcon {
+  align-items: center;
+  background: #fff0bf;
+  border-radius: 8px;
+  color: #d49418;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 30px;
+  justify-content: center;
+  width: 30px;
+}
+
+.navList button.active .navIcon {
+  background: rgba(255, 255, 255, 0.42);
+  color: #8b5514;
 }
 
 .navCount {
   align-items: center;
-  background: #ff9aad;
+  background: #ee755d;
   border-radius: 999px;
   color: #ffffff;
   display: inline-flex;
@@ -1175,13 +1213,20 @@ tbody tr {
   color: #b24d62;
 }
 
-/* Keep dashboard rows sized to their content instead of stretching sparse data. */
+/* Keep both dashboard tables on the same row rhythm. */
 .dashboardTableWrap table {
   height: auto;
 }
 
 .dashboardTableWrap tbody tr {
   height: 64px;
+}
+
+.dashboardTableWrap tbody td {
+  height: 64px;
+  padding-bottom: 0;
+  padding-top: 0;
+  vertical-align: middle;
 }
 
 .pocketMemberRow {
@@ -1207,11 +1252,6 @@ tbody tr {
 
 .pocketMemberRow:focus-visible td:first-child {
   box-shadow: inset 3px 0 0 #f6c84c;
-}
-
-#pockets td {
-  padding-bottom: 15px;
-  padding-top: 15px;
 }
 
 /* Version note editor */
@@ -1959,6 +1999,18 @@ tbody tr {
   font-weight: 900;
 }
 
+.versionHeaderActions .versionDeleteButton {
+  background: #ffffff;
+  border-color: #e88a78;
+  color: #c64f3d;
+}
+
+.versionHeaderActions .versionDeleteButton:hover:not(:disabled) {
+  background: #d95f4d;
+  border-color: #d95f4d;
+  color: #ffffff;
+}
+
 .appPatchPreviewBody {
   background: linear-gradient(180deg, #fffdf7 0%, #fff8e8 100%);
   min-height: 626px;
@@ -2034,6 +2086,73 @@ tbody tr {
   font-weight: 900;
   height: 36px;
   padding: 0 12px;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.logoutButton:hover {
+  background: #fff0c0;
+  border-color: #dfae2a;
+  color: #5a371c;
+}
+
+.logoutConfirmBackdrop {
+  align-items: center;
+  background: rgba(62, 40, 21, 0.18);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 22px;
+  position: fixed;
+  z-index: 20;
+}
+
+.logoutConfirmDialog {
+  background: #ffffff;
+  border: 1px solid #ead7b7;
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(62, 40, 21, 0.2);
+  max-width: 350px;
+  padding: 28px;
+  text-align: center;
+  width: 100%;
+}
+
+.logoutConfirmDialog h2 {
+  color: #5a371c;
+  font-size: 20px;
+  margin: 0;
+}
+
+.logoutConfirmDialog p {
+  color: #8b7355;
+  font-size: 14px;
+  margin: 10px 0 22px;
+}
+
+.logoutConfirmActions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.logoutConfirmActions button {
+  border-radius: 9px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+  padding: 10px 16px;
+}
+
+.logoutConfirmActions button:first-child {
+  background: #ffffff;
+  border: 1px solid #ead7b7;
+  color: #7a4d28;
+}
+
+.logoutConfirmActions button:last-child {
+  background: #f6c84c;
+  border: 1px solid #dfae2a;
+  color: #5a371c;
 }
 
 .databaseStatusPanel {
@@ -2674,6 +2793,36 @@ tbody tr {
   padding: 10px 16px;
 }
 
+.versionDeleteDialog {
+  border-color: #efc7bf;
+}
+
+.versionDeleteDialog .eyebrow {
+  color: #c64f3d;
+}
+
+.versionDeleteDialogActions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.versionDeleteDialogActions button {
+  width: auto;
+}
+
+.versionDeleteDialogActions button:first-child {
+  background: #ffffff;
+  border-color: #ead7b7;
+  color: #7a4d28;
+}
+
+.versionDeleteDialogActions button:last-child {
+  background: #d95f4d;
+  border-color: #c64f3d;
+  color: #ffffff;
+}
+
 .releaseLegend {
   border-bottom: 1px solid #f5e8cc;
   display: flex;
@@ -2801,5 +2950,23 @@ tbody tr {
 
   .databaseTwoColumn {
     grid-template-columns: 1fr;
+  }
+}
+
+.buttonSpinner {
+  animation: button-spinner-rotate 800ms linear infinite;
+}
+
+.srOnly {
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+}
+
+@keyframes button-spinner-rotate {
+  to {
+    transform: rotate(360deg);
   }
 }

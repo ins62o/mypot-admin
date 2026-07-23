@@ -6,6 +6,7 @@ import {
   FileText,
   Inbox,
   Layers3,
+  LoaderCircle,
   MessageCircle,
   RotateCw,
   Users,
@@ -19,6 +20,7 @@ import { StatCard } from './components/StatCard';
 import type { AdminDashboardMetrics, AdminPocket, AdminPocketMember, AdminUser, DatabaseBackup, DatabaseBackupStatus, SupportInquiry, VersionNote, VersionReleaseType } from './types/admin';
 import {
   answerSupportInquiry as answerSupportInquiryRemote,
+  deleteAdminVersionNote,
   isFirebaseConfigured,
   loadAdminDashboardMetrics,
   loadAdminDatabaseStatus,
@@ -72,6 +74,7 @@ function App() {
   const [loginId, setLoginId] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const [page, setPage] = useState<AdminPage>('dashboard');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [pockets, setPockets] = useState<AdminPocket[]>([]);
@@ -296,43 +299,57 @@ function App() {
           </div>
           <div>
             <strong>마이폿 관리자</strong>
-            <span>운영 콘솔</span>
+            <span>{databaseEnvironment === 'development' ? '개발 콘솔' : '운영 콘솔'}</span>
           </div>
         </div>
 
         <nav className="navList" aria-label="관리자 메뉴">
-          <button
-            className={page === 'dashboard' ? 'active' : ''}
-            type="button"
-            onClick={() => setPage('dashboard')}
-          >
-            <Database size={18} /> 대시보드
-          </button>
+          <section className="navGroup" aria-label="개요">
+            <p className="navGroupLabel">개요</p>
+            <button
+              className={page === 'dashboard' ? 'active' : ''}
+              type="button"
+              onClick={() => setPage('dashboard')}
+            >
+              <span className="navIcon"><Database size={18} /></span>
+              <span>대시보드</span>
+            </button>
+          </section>
 
-          <button
-            className={page === 'versions' ? 'active' : ''}
-            type="button"
-            onClick={() => setPage('versions')}
-          >
-            <FileText size={18} /> 버전 노트
-          </button>
-          <button
-            className={page === 'support' ? 'active' : ''}
-            type="button"
-            onClick={() => setPage('support')}
-          >
-            <Inbox size={18} /> 1:1 문의
-            {waitingInquiryCount > 0 ? (
-              <span className="navCount">{waitingInquiryCount}</span>
-            ) : null}
-          </button>
-                    <button
-            className={page === 'database' ? 'active' : ''}
-            type="button"
-            onClick={() => setPage('database')}
-          >
-            <RotateCw size={18} /> DB 현황
-          </button>
+          <section className="navGroup" aria-label="운영 관리">
+            <p className="navGroupLabel">운영 관리</p>
+            <button
+              className={page === 'versions' ? 'active' : ''}
+              type="button"
+              onClick={() => setPage('versions')}
+            >
+              <span className="navIcon"><FileText size={18} /></span>
+              <span>버전 노트</span>
+            </button>
+            <button
+              className={page === 'support' ? 'active' : ''}
+              type="button"
+              onClick={() => setPage('support')}
+            >
+              <span className="navIcon"><Inbox size={18} /></span>
+              <span>1:1 문의</span>
+              {waitingInquiryCount > 0 ? (
+                <span className="navCount">{waitingInquiryCount}</span>
+              ) : null}
+            </button>
+          </section>
+
+          <section className="navGroup navGroupSystem" aria-label="시스템">
+            <p className="navGroupLabel">시스템</p>
+            <button
+              className={page === 'database' ? 'active' : ''}
+              type="button"
+              onClick={() => setPage('database')}
+            >
+              <span className="navIcon"><RotateCw size={18} /></span>
+              <span>DB 현황</span>
+            </button>
+          </section>
         </nav>
       </aside>
 
@@ -341,7 +358,11 @@ function App() {
           <div>
             <h1>{pageTitle[page]}</h1>
           </div>
-          <button className="logoutButton" type="button" onClick={logoutAdmin}>
+          <button
+            className="logoutButton"
+            type="button"
+            onClick={() => setIsLogoutDialogOpen(true)}
+          >
             로그아웃
           </button>
         </header>
@@ -376,6 +397,7 @@ function App() {
             environment={databaseEnvironment}
             notes={versionNotes}
             onChangeNotes={setVersionNotes}
+            onDeleteNote={(note) => deleteAdminVersionNote(note.id, databaseEnvironment)}
             onSaveNote={(note) => saveAdminVersionNote(note, databaseEnvironment)}
             onSelectNote={setSelectedVersionId}
             selectedNote={selectedVersion}
@@ -395,6 +417,27 @@ function App() {
           />
         ) : null}
       </main>
+      {isLogoutDialogOpen ? (
+        <div className="logoutConfirmBackdrop" role="presentation">
+          <section
+            aria-labelledby="logout-confirm-title"
+            aria-modal="true"
+            className="logoutConfirmDialog"
+            role="dialog"
+          >
+            <h2 id="logout-confirm-title">로그아웃할까요?</h2>
+            <p>로그아웃하면 다시 로그인해야 해요.</p>
+            <div className="logoutConfirmActions">
+              <button type="button" onClick={() => setIsLogoutDialogOpen(false)}>
+                취소
+              </button>
+              <button type="button" onClick={logoutAdmin}>
+                로그아웃
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -440,16 +483,18 @@ function DashboardPage({
   const filteredUsers = useMemo(() => {
     const normalizedQuery = userQuery.trim().toLowerCase();
 
-    if (!normalizedQuery) {
-      return users;
-    }
+    return users
+      .filter((user) => {
+        if (!normalizedQuery) {
+          return true;
+        }
 
-    return users.filter((user) =>
-      [user.displayName, user.email, user.id]
-        .join(' ')
-        .toLowerCase()
-        .includes(normalizedQuery),
-    );
+        return [user.displayName, user.email, user.id]
+          .join(' ')
+          .toLowerCase()
+          .includes(normalizedQuery);
+      })
+      .sort((left, right) => right.joinedAt.localeCompare(left.joinedAt));
   }, [userQuery, users]);
 
   const sortedPockets = useMemo(() => {
@@ -1085,6 +1130,7 @@ type VersionNotesPageProps = {
   environment: DatabaseEnvironment;
   notes: VersionNote[];
   onChangeNotes: (notes: VersionNote[]) => void;
+  onDeleteNote: (note: VersionNote) => Promise<void> | void;
   onSaveNote: (note: VersionNote) => Promise<void> | void;
   onSelectNote: (id: string) => void;
   selectedNote: VersionNote | null;
@@ -1094,12 +1140,15 @@ function VersionNotesPage({
   environment,
   notes,
   onChangeNotes,
+  onDeleteNote,
   onSaveNote,
   onSelectNote,
   selectedNote,
 }: VersionNotesPageProps) {
   const [saveMessage, setSaveMessage] = useState('');
   const [savedVersionNote, setSavedVersionNote] = useState<VersionNote | null>(null);
+  const [notePendingDeletion, setNotePendingDeletion] = useState<VersionNote | null>(null);
+  const [isDeletingVersionNote, setIsDeletingVersionNote] = useState(false);
   const [isSavingVersionNote, setIsSavingVersionNote] = useState(false);
   const environmentLabel = environment === 'production' ? '운영' : '개발';
 
@@ -1162,6 +1211,34 @@ function VersionNotesPage({
       setSaveMessage('저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
     } finally {
       setIsSavingVersionNote(false);
+    }
+  }
+
+  function requestVersionNoteDeletion() {
+    if (!selectedNote || isDeletingVersionNote || isSavingVersionNote) {
+      return;
+    }
+
+    setNotePendingDeletion(selectedNote);
+  }
+
+  async function deleteVersionNote() {
+    if (!notePendingDeletion || isDeletingVersionNote || isSavingVersionNote) {
+      return;
+    }
+
+    try {
+      setIsDeletingVersionNote(true);
+      await onDeleteNote(notePendingDeletion);
+      const remainingNotes = notes.filter((note) => note.id !== notePendingDeletion.id);
+      onChangeNotes(remainingNotes);
+      onSelectNote(remainingNotes[0]?.id ?? '');
+      setNotePendingDeletion(null);
+      setSaveMessage('버전 노트를 삭제했어요.');
+    } catch {
+      setSaveMessage('삭제하지 못했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setIsDeletingVersionNote(false);
     }
   }
 
@@ -1262,8 +1339,27 @@ function VersionNotesPage({
           </div>
           <div className="versionHeaderActions">
             {saveMessage ? <span>{saveMessage}</span> : null}
-            <button disabled={isSavingVersionNote} type="button" onClick={saveVersionNote}>
+            <button
+              disabled={isSavingVersionNote || isDeletingVersionNote}
+              type="button"
+              onClick={saveVersionNote}
+            >
               {isSavingVersionNote ? '저장 중' : '저장'}
+            </button>
+            <button
+              className="versionDeleteButton"
+              disabled={isSavingVersionNote || isDeletingVersionNote}
+              type="button"
+              onClick={requestVersionNoteDeletion}
+            >
+              {isDeletingVersionNote ? (
+                  <>
+                    <LoaderCircle aria-hidden="true" className="buttonSpinner" size={18} />
+                    <span className="srOnly">삭제 중</span>
+                  </>
+                ) : (
+                  '삭제'
+                )}
             </button>
           </div>
         </div>
@@ -1403,6 +1499,42 @@ function VersionNotesPage({
             <button type="button" onClick={() => setSavedVersionNote(null)}>
               확인
             </button>
+          </section>
+        </div>
+      ) : null}
+      {notePendingDeletion ? (
+        <div className="versionSaveBackdrop" role="presentation">
+          <section
+            aria-labelledby="version-delete-title"
+            aria-modal="true"
+            className="versionSaveDialog versionDeleteDialog"
+            role="dialog"
+          >
+            <h2 id="version-delete-title">버전 노트를 삭제할까요?</h2>
+            <p>{notePendingDeletion.version} 버전 노트가 삭제됩니다.</p>
+            <div className="versionDeleteDialogActions">
+              <button
+                disabled={isDeletingVersionNote}
+                type="button"
+                onClick={() => setNotePendingDeletion(null)}
+              >
+                취소
+              </button>
+              <button
+                disabled={isDeletingVersionNote}
+                type="button"
+                onClick={deleteVersionNote}
+              >
+                {isDeletingVersionNote ? (
+                  <>
+                    <LoaderCircle aria-hidden="true" className="buttonSpinner" size={18} />
+                    <span className="srOnly">삭제 중</span>
+                  </>
+                ) : (
+                  '삭제'
+                )}
+              </button>
+            </div>
           </section>
         </div>
       ) : null}
@@ -1695,9 +1827,3 @@ function StatusBadge({ status }: { status: BadgeStatus }) {
 }
 
 export default App;
-
-
-
-
-
-

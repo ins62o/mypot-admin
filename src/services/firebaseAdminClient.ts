@@ -130,6 +130,13 @@ export async function saveAdminVersionNote(
   await callAdminFunction('saveAdminVersionNote', { ...note, environment });
 }
 
+export async function deleteAdminVersionNote(
+  noteId: string,
+  environment: DatabaseEnvironment = 'production',
+) {
+  await callAdminFunction('deleteAdminVersionNote', { environment, noteId });
+}
+
 export async function loadAdminSupportInquiries(): Promise<SupportInquiry[]> {
   const result = await callAdminFunction<{ inquiries: SupportInquiry[] }>(
     'listAdminSupportInquiries',
