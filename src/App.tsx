@@ -299,7 +299,7 @@ function App() {
           </div>
           <div>
             <strong>마이폿 관리자</strong>
-            <span>{databaseEnvironment === 'development' ? '개발 콘솔이' : '운영 콘솔이'}</span>
+            <span>{databaseEnvironment === 'development' ? '개발 콘솔삼' : '운영 콘솔삼'}</span>
           </div>
         </div>
 
