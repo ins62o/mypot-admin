@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+﻿import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
   Check,
   ChevronDown,
@@ -299,7 +299,7 @@ function App() {
           </div>
           <div>
             <strong>마이폿 관리자</strong>
-            <span>{databaseEnvironment === 'development' ? '개발 콘솔' : '운영 콘솔'}</span>
+            <span>{databaseEnvironment === 'development' ? '개발 콘솔이' : '운영 콘솔이'}</span>
           </div>
         </div>
 
