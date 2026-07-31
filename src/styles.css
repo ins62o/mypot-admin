@@ -3111,14 +3111,51 @@ tbody tr {
   margin: 7px 0 5px;
 }
 
-.updateReleaseList article > small,
+.updateReleaseFooter small,
 .updateReleaseEmpty {
   color: #8b7355;
   font-size: 10px;
 }
 
+.updateReleaseFooter {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
 .updateReleaseEmpty {
   margin: 0;
+}
+
+.updateReleaseDelete {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #efc8b6;
+  border-radius: 9px;
+  color: #984c28;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 900;
+  gap: 5px;
+  justify-content: center;
+  min-height: 30px;
+  padding: 5px 8px;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.updateReleaseDelete:hover:not(:disabled) {
+  background: #fff0f3;
+  border-color: #efa9b7;
+  color: #b23b56;
+}
+
+.updateReleaseDelete:disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 .updatePublishConfirmBackdrop {
@@ -3156,6 +3193,11 @@ tbody tr {
 }
 
 .updatePublishConfirmDialog > span.required {
+  background: #ffe5d7;
+  color: #984c28;
+}
+
+.updatePublishConfirmDialog > span.updateConfirmBadge {
   background: #ffe5d7;
   color: #984c28;
 }
@@ -3327,7 +3369,6 @@ tbody tr {
     0 0 0 1px rgba(223, 174, 42, 0.28),
     0 8px 22px rgba(181, 126, 22, 0.18);
   height: 58px;
-  transform: rotate(-3deg);
   width: 58px;
 }
 
@@ -3470,6 +3511,30 @@ tbody tr {
   color: #8b7355;
   font-size: 13px;
   margin: 8px 0 0;
+}
+
+.updateWebLoading {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 160px;
+  width: 100%;
+}
+
+.updateWebSpinner {
+  animation: updateWebSpin 720ms linear infinite;
+  border: 4px solid rgba(246, 200, 76, 0.28);
+  border-radius: 999px;
+  border-top-color: #dfae2a;
+  display: block;
+  height: 42px;
+  width: 42px;
+}
+
+@keyframes updateWebSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .maintenanceWebPage {

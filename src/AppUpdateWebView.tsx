@@ -86,8 +86,12 @@ export function AppUpdateWebView() {
           <p>마이폿을 계속 편안하게 이용해 주세요.</p>
         </section>
       ) : (
-        <section className="updateWebState">
-          <strong>업데이트 소식을 불러오는 중이에요.</strong>
+        <section
+          aria-label="업데이트 소식 불러오는 중"
+          className="updateWebLoading"
+          role="status"
+        >
+          <span aria-hidden="true" className="updateWebSpinner" />
         </section>
       )}
     </main>

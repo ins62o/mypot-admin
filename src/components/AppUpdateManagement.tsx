@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Check, Copy } from 'lucide-react';
 
 import {
+  deleteLatestAdminAppUpdateRelease,
   loadAdminAppUpdateConfig,
   loadAdminAppUpdateReleases,
   saveAdminAppUpdateConfig,
@@ -51,6 +52,9 @@ export function AppUpdateManagement({
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishConfirmOpen, setIsPublishConfirmOpen] = useState(false);
+  const [releasePendingDeletion, setReleasePendingDeletion] =
+    useState<AppUpdateRelease | null>(null);
+  const [isDeletingRelease, setIsDeletingRelease] = useState(false);
   const [isUrlCopied, setIsUrlCopied] = useState(false);
   const [message, setMessage] = useState('');
   const [releases, setReleases] = useState<AppUpdateRelease[]>([]);
@@ -145,15 +149,44 @@ export function AppUpdateManagement({
         environment,
       );
       setConfig(savedConfig);
-      setReleases((current) => [
-        { ...savedConfig, id: `published-${Date.now()}` },
-        ...current,
-      ]);
+      setReleases(await loadAdminAppUpdateReleases(environment));
       setMessage('새 업데이트를 게시하고 사용자에게 적용했어요.');
     } catch {
       setMessage('게시하지 못했어요. 버전과 스토어 주소를 확인해 주세요.');
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function deleteLatestRelease() {
+    if (!releasePendingDeletion || isDeletingRelease) return;
+
+    try {
+      setIsDeletingRelease(true);
+      setMessage('');
+      const restoredConfig = await deleteLatestAdminAppUpdateRelease(
+        releasePendingDeletion.id,
+        environment,
+      );
+      setConfig({
+        ...restoredConfig,
+        buttonLabel: FIXED_UPDATE_BUTTON_LABEL,
+        dismissLabel: FIXED_DISMISS_LABEL,
+        highlights: restoredConfig.highlights.slice(0, 3),
+        summary: '',
+        title: FIXED_UPDATE_TITLE,
+      });
+      setReleases(await loadAdminAppUpdateReleases(environment));
+      setReleasePendingDeletion(null);
+      setMessage(
+        restoredConfig.enabled
+          ? '최근 게시를 취소하고 직전 업데이트 설정으로 복원했어요.'
+          : '최근 게시를 취소하고 업데이트 안내를 종료했어요.',
+      );
+    } catch {
+      setMessage('게시를 취소하지 못했어요. 목록을 새로고침한 뒤 다시 시도해 주세요.');
+    } finally {
+      setIsDeletingRelease(false);
     }
   }
 
@@ -293,7 +326,7 @@ export function AppUpdateManagement({
           </div>
           {releases.length > 0 ? (
             <div className="updateReleaseList">
-              {releases.map((release) => (
+              {releases.map((release, index) => (
                 <article key={release.id}>
                   <div>
                     <strong>
@@ -305,11 +338,25 @@ export function AppUpdateManagement({
                     </span>
                   </div>
                   <p>{release.title}</p>
-                  <small>
-                    {release.publishedAt
-                      ? new Date(release.publishedAt).toLocaleString('ko-KR')
-                      : '방금 게시'}
-                  </small>
+                  <div className="updateReleaseFooter">
+                    <small>
+                      {release.publishedAt
+                        ? new Date(release.publishedAt).toLocaleString('ko-KR')
+                        : '방금 게시'}
+                    </small>
+                    {index === 0 ? (
+                      <button
+                        aria-label="최근 업데이트 게시 취소"
+                        className="updateReleaseDelete"
+                        disabled={isDeletingRelease}
+                        title="최근 게시 취소"
+                        type="button"
+                        onClick={() => setReleasePendingDeletion(release)}
+                      >
+                        게시 취소
+                      </button>
+                    ) : null}
+                  </div>
                 </article>
               ))}
             </div>
@@ -384,6 +431,46 @@ export function AppUpdateManagement({
               </button>
               <button type="button" onClick={publish}>
                 확인
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {releasePendingDeletion ? (
+        <div className="updatePublishConfirmBackdrop" role="presentation">
+          <section
+            aria-labelledby="update-release-delete-title"
+            aria-modal="true"
+            className="updatePublishConfirmDialog"
+            role="dialog"
+          >
+            <span className="updateConfirmBadge">게시 취소</span>
+            <h2 id="update-release-delete-title">
+              최근 업데이트 게시를 취소할까요?
+            </h2>
+            <p>
+              사용자에게 즉시 반영되며, 직전 업데이트 설정과 최소 지원
+              버전으로 복원됩니다.
+            </p>
+            <strong>
+              iOS {releasePendingDeletion.platforms.ios.latestVersion} · Android{' '}
+              {releasePendingDeletion.platforms.android.latestVersion}
+            </strong>
+            <div>
+              <button
+                disabled={isDeletingRelease}
+                type="button"
+                onClick={() => setReleasePendingDeletion(null)}
+              >
+                취소
+              </button>
+              <button
+                disabled={isDeletingRelease}
+                type="button"
+                onClick={() => void deleteLatestRelease()}
+              >
+                {isDeletingRelease ? '취소 중' : '게시 취소'}
               </button>
             </div>
           </section>

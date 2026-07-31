@@ -157,6 +157,17 @@ export async function loadAdminAppUpdateReleases(
   return result.releases;
 }
 
+export async function deleteLatestAdminAppUpdateRelease(
+  releaseId: string,
+  environment: DatabaseEnvironment = 'production',
+): Promise<AppUpdateConfig> {
+  const result = await callAdminFunction<{
+    config: AppUpdateConfig;
+    deletedId: string;
+  }>('deleteLatestAdminAppUpdateRelease', { environment, releaseId });
+  return result.config;
+}
+
 async function callDevelopmentPublicFunction<T>(name: string): Promise<T> {
   const response = await fetch(
     `https://asia-northeast3-mypot-dev-8558a.cloudfunctions.net/${name}`,
