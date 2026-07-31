@@ -35,7 +35,7 @@ export function MaintenanceManagement({
   const [isUrlCopied, setIsUrlCopied] = useState(false);
   const [pendingAction, setPendingAction] = useState<'end' | 'publish' | null>(null);
   const [message, setMessage] = useState('');
-  const webViewUrl = 'https://admin.mypot.kr/maintenance';
+  const webViewUrl = 'https://admin.mypot.kr/maintenance/index.html';
 
   useEffect(() => {
     let isMounted = true;

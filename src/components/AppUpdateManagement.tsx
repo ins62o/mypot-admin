@@ -158,7 +158,8 @@ export function AppUpdateManagement({
   }
 
   const environmentLabel = environment === 'production' ? '운영' : '개발';
-  const webViewUrl = `https://admin.mypot.kr/app-update?platform=${platform}`;
+  const webViewUrl =
+    `https://admin.mypot.kr/app-update/index.html?platform=${platform}`;
 
   async function copyWebViewUrl() {
     try {

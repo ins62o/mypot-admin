@@ -14,6 +14,13 @@ function requestedVersion() {
   return new URLSearchParams(window.location.search).get('currentVersion')?.trim() ?? '';
 }
 
+function requestedEnvironment(): 'development' | 'production' {
+  return new URLSearchParams(window.location.search).get('environment') ===
+    'development'
+    ? 'development'
+    : 'production';
+}
+
 function compareVersions(left: string, right: string) {
   const parts = (value: string) =>
     value.split(/[+-]/, 1)[0].split('.').map((part) => Number.parseInt(part, 10) || 0);
@@ -31,6 +38,7 @@ export function AppUpdateWebView() {
   const [config, setConfig] = useState<AppUpdateConfig | null>(null);
   const [hasError, setHasError] = useState(false);
   const platform = requestedPlatform();
+  const environment = requestedEnvironment();
   const currentVersion = requestedVersion();
   const platformConfig = config?.platforms[platform];
   const isLatest = Boolean(
@@ -46,7 +54,7 @@ export function AppUpdateWebView() {
   useEffect(() => {
     let isMounted = true;
 
-    loadPublishedAppUpdateConfig()
+    loadPublishedAppUpdateConfig(environment)
       .then((loadedConfig) => {
         if (isMounted) {
           setConfig(loadedConfig);
@@ -61,7 +69,7 @@ export function AppUpdateWebView() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [environment]);
 
   return (
     <main className="updateWebPage">

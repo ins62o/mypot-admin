@@ -157,7 +157,35 @@ export async function loadAdminAppUpdateReleases(
   return result.releases;
 }
 
-export async function loadPublishedAppUpdateConfig(): Promise<AppUpdateConfig> {
+async function callDevelopmentPublicFunction<T>(name: string): Promise<T> {
+  const response = await fetch(
+    `https://asia-northeast3-mypot-dev-8558a.cloudfunctions.net/${name}`,
+    {
+      body: JSON.stringify({ data: {} }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    },
+  );
+  const payload = (await response.json()) as {
+    data?: T;
+    result?: T;
+  };
+  const result = payload.data ?? payload.result;
+  if (!response.ok || !result) {
+    throw new Error('개발 공개 설정을 불러오지 못했어요.');
+  }
+  return result;
+}
+
+export async function loadPublishedAppUpdateConfig(
+  environment: DatabaseEnvironment = 'production',
+): Promise<AppUpdateConfig> {
+  if (environment === 'development') {
+    const result = await callDevelopmentPublicFunction<{ config: AppUpdateConfig }>(
+      'getPublishedAppUpdate',
+    );
+    return result.config;
+  }
   const result = await callAdminFunction<{ config: AppUpdateConfig }>(
     'getPublishedAppUpdate',
   );
@@ -185,7 +213,15 @@ export async function saveAdminMaintenanceConfig(
   return result.config;
 }
 
-export async function loadPublishedMaintenanceConfig(): Promise<MaintenanceConfig> {
+export async function loadPublishedMaintenanceConfig(
+  environment: DatabaseEnvironment = 'production',
+): Promise<MaintenanceConfig> {
+  if (environment === 'development') {
+    const result = await callDevelopmentPublicFunction<{ config: MaintenanceConfig }>(
+      'getPublishedMaintenance',
+    );
+    return result.config;
+  }
   const result = await callAdminFunction<{ config: MaintenanceConfig }>(
     'getPublishedMaintenance',
   );

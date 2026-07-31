@@ -8,10 +8,14 @@ import './styles.css';
 export function MaintenanceWebView() {
   const [config, setConfig] = useState<MaintenanceConfig | null>(null);
   const [hasError, setHasError] = useState(false);
+  const environment =
+    new URLSearchParams(window.location.search).get('environment') === 'development'
+      ? 'development'
+      : 'production';
 
   useEffect(() => {
     let isMounted = true;
-    loadPublishedMaintenanceConfig()
+    loadPublishedMaintenanceConfig(environment)
       .then((loaded) => {
         if (isMounted) setConfig(loaded);
       })
@@ -21,7 +25,7 @@ export function MaintenanceWebView() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [environment]);
 
   return (
     <main className="updateWebPage maintenanceWebPage">
