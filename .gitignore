@@ -1,6 +1,4 @@
-.env
-.env.local
+.env*
 node_modules
 dist
-vite-dev.*.log
-vite-dev-current.*.log
+*.log

@@ -15,9 +15,12 @@ import type {
   AdminPocket,
   AdminPocketMember,
   AdminUser,
+  AppUpdateConfig,
+  AppUpdateRelease,
   DatabaseBackup,
   DatabaseBackupStatus,
   DatabaseRestoreOperation,
+  MaintenanceConfig,
   SupportInquiry,
   VersionNote,
 } from '../types/admin';
@@ -123,6 +126,72 @@ export async function loadAdminVersionNotes(
   return result.notes;
 }
 
+export async function loadAdminAppUpdateConfig(
+  environment: DatabaseEnvironment = 'production',
+): Promise<AppUpdateConfig> {
+  const result = await callAdminFunction<{ config: AppUpdateConfig }>(
+    'getAdminAppUpdateConfig',
+    { environment },
+  );
+  return result.config;
+}
+
+export async function saveAdminAppUpdateConfig(
+  config: AppUpdateConfig,
+  environment: DatabaseEnvironment = 'production',
+): Promise<AppUpdateConfig> {
+  const result = await callAdminFunction<{ config: AppUpdateConfig }>(
+    'saveAdminAppUpdateConfig',
+    { ...config, environment },
+  );
+  return result.config;
+}
+
+export async function loadAdminAppUpdateReleases(
+  environment: DatabaseEnvironment = 'production',
+): Promise<AppUpdateRelease[]> {
+  const result = await callAdminFunction<{ releases: AppUpdateRelease[] }>(
+    'listAdminAppUpdateReleases',
+    { environment },
+  );
+  return result.releases;
+}
+
+export async function loadPublishedAppUpdateConfig(): Promise<AppUpdateConfig> {
+  const result = await callAdminFunction<{ config: AppUpdateConfig }>(
+    'getPublishedAppUpdate',
+  );
+  return result.config;
+}
+
+export async function loadAdminMaintenanceConfig(
+  environment: DatabaseEnvironment = 'production',
+): Promise<MaintenanceConfig> {
+  const result = await callAdminFunction<{ config: MaintenanceConfig }>(
+    'getAdminMaintenanceConfig',
+    { environment },
+  );
+  return result.config;
+}
+
+export async function saveAdminMaintenanceConfig(
+  config: MaintenanceConfig,
+  environment: DatabaseEnvironment = 'production',
+): Promise<MaintenanceConfig> {
+  const result = await callAdminFunction<{ config: MaintenanceConfig }>(
+    'saveAdminMaintenanceConfig',
+    { ...config, environment },
+  );
+  return result.config;
+}
+
+export async function loadPublishedMaintenanceConfig(): Promise<MaintenanceConfig> {
+  const result = await callAdminFunction<{ config: MaintenanceConfig }>(
+    'getPublishedMaintenance',
+  );
+  return result.config;
+}
+
 export async function saveAdminVersionNote(
   note: VersionNote,
   environment: DatabaseEnvironment = 'production',
@@ -203,5 +272,3 @@ async function callAdminFunction<TResponse>(name: string, payload?: unknown) {
   const result = await callable(payload ?? {});
   return result.data;
 }
-
-

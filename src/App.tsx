@@ -9,6 +9,7 @@ import {
   LoaderCircle,
   MessageCircle,
   RotateCw,
+  Smartphone,
   Users,
 } from 'lucide-react';
 
@@ -16,6 +17,7 @@ import appIcon from './assets/app-icon.png';
 import appleLogo from './assets/social/apple-login.svg';
 import kakaoLogo from './assets/social/kakao-login.svg';
 import { AdminSearch } from './components/AdminSearch';
+import { AppNoticeManagement } from './components/AppNoticeManagement';
 import { StatCard } from './components/StatCard';
 import type { AdminDashboardMetrics, AdminPocket, AdminPocketMember, AdminUser, DatabaseBackup, DatabaseBackupStatus, SupportInquiry, VersionNote, VersionReleaseType } from './types/admin';
 import {
@@ -40,8 +42,10 @@ import './styles.css';
 
 const PAGE_SIZE = 10;
 const DATABASE_ENVIRONMENT_STORAGE_KEY = 'mypot-admin-database-environment';
+const ADMIN_LOGIN_ALIAS = 'mypot';
+const ADMIN_LOGIN_EMAIL = 'mypot.support@gmail.com';
 
-type AdminPage = 'dashboard' | 'database' | 'versions' | 'support';
+type AdminPage = 'dashboard' | 'database' | 'updates' | 'versions' | 'support';
 type PocketSortKey = 'memberCount' | 'recordCount' | 'level' | 'status';
 type DataSourceStatus = 'firebase' | 'loading' | 'error';
 
@@ -50,7 +54,7 @@ const statusLabel = {
   answered: '답변 완료',
   draft: '작성중',
   pendingDeletion: '삭제 대기',
-  published: '배포됨',
+  published: '작성 완료',
   waiting: '답변 대기',
 } as const;
 
@@ -65,6 +69,7 @@ const pageTitle: Record<AdminPage, string> = {
   database: 'DB 현황',
   dashboard: '대시보드',
   support: '1:1 문의',
+  updates: '앱 공지 관리',
   versions: '버전 노트',
 };
 
@@ -78,7 +83,9 @@ function App() {
   const [page, setPage] = useState<AdminPage>('dashboard');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [pockets, setPockets] = useState<AdminPocket[]>([]);
-  const [versionNotes, setVersionNotes] = useState<VersionNote[]>([]);
+  const [versionNotes, setVersionNotes] = useState<VersionNote[]>(() =>
+    ensureVersionNoteDraft([]),
+  );
   const [supportInquiries, setSupportInquiries] = useState<SupportInquiry[]>([]);
   const [dataSourceStatus, setDataSourceStatus] = useState<DataSourceStatus>('loading');
   const [firebaseStatusMessage, setFirebaseStatusMessage] = useState('운영 Firebase 연결 대기 중');
@@ -101,7 +108,7 @@ function App() {
     });
   const [dashboardMetrics, setDashboardMetrics] =
     useState<AdminDashboardMetrics>({ pocketWeeklyDelta: 0, userWeeklyDelta: 0 });
-  const [selectedVersionId, setSelectedVersionId] = useState('');
+  const [selectedVersionId, setSelectedVersionId] = useState('version_1.0.0');
 
   const activePocketCount = pockets.filter(
     (pocketItem) => pocketItem.status === 'active',
@@ -151,8 +158,17 @@ function App() {
         setPockets(loadedPockets.value);
       }
       if (loadedNotes.status === 'fulfilled') {
-        setVersionNotes(loadedNotes.value);
-        setSelectedVersionId(loadedNotes.value[0]?.id ?? '');
+        const notesWithDraft = ensureVersionNoteDraft(loadedNotes.value);
+        setVersionNotes(notesWithDraft);
+        setSelectedVersionId(
+          notesWithDraft.find((note) => note.status === 'draft')?.id ??
+            notesWithDraft[0]?.id ??
+            '',
+        );
+      } else {
+        const fallbackNotes = ensureVersionNoteDraft([]);
+        setVersionNotes(fallbackNotes);
+        setSelectedVersionId(fallbackNotes[0].id);
       }
       if (loadedInquiries.status === 'fulfilled') {
         setSupportInquiries(
@@ -230,7 +246,12 @@ function App() {
 
     try {
       setLoginError('');
-      await loginAdminWithEmail(loginId.trim(), loginPassword);
+      const normalizedLoginId = loginId.trim();
+      const email =
+        normalizedLoginId.toLowerCase() === ADMIN_LOGIN_ALIAS
+          ? ADMIN_LOGIN_EMAIL
+          : normalizedLoginId;
+      await loginAdminWithEmail(email, loginPassword);
       setLoginPassword('');
     } catch {
       setLoginError('Firebase 이메일 또는 비밀번호를 확인해 주세요.');
@@ -256,9 +277,9 @@ function App() {
           </div>
 
           <label>
-            이메일
+            아이디 또는 이메일
             <input
-              autoComplete="email"
+              autoComplete="username"
               value={loginId}
               onChange={(event) => {
                 setLoginId(event.target.value);
@@ -318,6 +339,14 @@ function App() {
 
           <section className="navGroup" aria-label="운영 관리">
             <p className="navGroupLabel">운영 관리</p>
+            <button
+              className={page === 'updates' ? 'active' : ''}
+              type="button"
+              onClick={() => setPage('updates')}
+            >
+              <span className="navIcon"><Smartphone size={18} /></span>
+              <span>앱 공지 관리</span>
+            </button>
             <button
               className={page === 'versions' ? 'active' : ''}
               type="button"
@@ -402,6 +431,10 @@ function App() {
             onSelectNote={setSelectedVersionId}
             selectedNote={selectedVersion}
           />
+        ) : null}
+
+        {page === 'updates' ? (
+          <AppNoticeManagement environment={databaseEnvironment} />
         ) : null}
 
         {page === 'support' ? (
@@ -1164,21 +1197,15 @@ function VersionNotesPage({
   }
 
   function createVersionNote() {
+    const existingDraft = notes.find((note) => note.status === 'draft');
+    if (existingDraft) {
+      setSaveMessage(`${existingDraft.version} 버전을 작성 중이에요.`);
+      onSelectNote(existingDraft.id);
+      return;
+    }
+
     const version = getNextPatchVersion(notes);
-    const newNote: VersionNote = {
-      id: `version_${version}`,
-      version,
-      releasedAt: formatToday(),
-      summary: '새 버전 노트를 작성 중입니다.',
-      patches: [
-        {
-          title: '새 업데이트 제목',
-          description: '앱에 반영할 변경 내용을 입력해 주세요.',
-        },
-      ],
-      releaseType: notes.length === 0 ? 'major' : 'patch',
-      status: 'draft',
-    };
+    const newNote = createVersionNoteDraft(version, notes.length === 0);
 
     setSaveMessage(`${version} 새 노트 생성`);
     onChangeNotes([newNote, ...notes]);
@@ -1200,12 +1227,14 @@ function VersionNotesPage({
     try {
       setIsSavingVersionNote(true);
       await onSaveNote(noteToSave);
-      onChangeNotes(
-        notes
-          .map((note) => (note.id === selectedNote.id ? noteToSave : note))
-          .sort(compareVersionNotes),
-      );
-      setSaveMessage(`${selectedNote.version} 저장 완료 · ${releaseTypeLabel[releaseType]}`);
+      const publishedNotes = notes
+        .map((note) => (note.id === selectedNote.id ? noteToSave : note))
+        .sort(compareVersionNotes);
+      const nextVersion = getNextPatchVersion(publishedNotes);
+      const nextDraft = createVersionNoteDraft(nextVersion, false);
+      onChangeNotes([nextDraft, ...publishedNotes]);
+      onSelectNote(nextDraft.id);
+      setSaveMessage(`${selectedNote.version} 작성 완료 · ${nextVersion} 작성 중`);
       setSavedVersionNote(noteToSave);
     } catch {
       setSaveMessage('저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
@@ -1319,7 +1348,14 @@ function VersionNotesPage({
             >
               <div>
                 <strong>{note.version}</strong>
-                <span className={`releaseTypeTag ${note.releaseType}`}>{releaseTypeLabel[note.releaseType]}</span>
+                <span className="versionHistoryTags">
+                  <span className={`releaseTypeTag ${note.releaseType}`}>
+                    {releaseTypeLabel[note.releaseType]}
+                  </span>
+                  <span className={`versionStatusTag ${note.status}`}>
+                    {note.status === 'draft' ? '작성 중' : '작성 완료'}
+                  </span>
+                </span>
               </div>
               <small>{note.releasedAt}</small>
             </button>
@@ -1344,7 +1380,7 @@ function VersionNotesPage({
               type="button"
               onClick={saveVersionNote}
             >
-              {isSavingVersionNote ? '저장 중' : '저장'}
+              {isSavingVersionNote ? '작성 중' : '작성'}
             </button>
             <button
               className="versionDeleteButton"
@@ -1386,16 +1422,6 @@ function VersionNotesPage({
               }
             />
           </label>
-          <label className="wideField">
-            히스토리 요약
-            <input
-              value={selectedNote.summary}
-              onChange={(event) =>
-                updateSelectedNote({ ...selectedNote, summary: event.target.value })
-              }
-            />
-          </label>
-
           <div className="patchEditorHeader">
             <h3>앱 패치 항목</h3>
             <button type="button" onClick={addPatch}>
@@ -1450,31 +1476,34 @@ function VersionNotesPage({
           </div>
         </div>
         <div className="appPatchPreviewBody">
-          <div className="appVersionPatchCard standalonePatchCard">
-            <div className="appNotebookBinding">
-              {[0, 1, 2, 3].map((item) => (
-                <span key={item} />
-              ))}
-            </div>
-            <div className="appNotebookBody">
-              <div className="appPatchHeader">
-                <div>
-                  <h3>이번 패치노트</h3>
-                  <p>{selectedNote.releasedAt} 업데이트</p>
-                </div>
-                <span>최신</span>
-              </div>
-              <div className="appPatchDivider" />
-              <div className="appPatchList">
-                {selectedNote.patches.map((patch) => (
-                  <div className="appPatchRow" key={patch.title}>
-                    <div className="appPatchIcon">✓</div>
-                    <div>
-                      <strong>{patch.title}</strong>
-                      <p>{patch.description}</p>
-                    </div>
-                  </div>
+          <div className="versionPreviewPhone">
+            <div className="versionPreviewSpeaker" />
+            <div className="appVersionPatchCard standalonePatchCard">
+              <div className="appNotebookBinding">
+                {[0, 1, 2, 3].map((item) => (
+                  <span key={item} />
                 ))}
+              </div>
+              <div className="appNotebookBody">
+                <div className="appPatchHeader">
+                  <div>
+                    <h3>이번 패치노트</h3>
+                    <p>{selectedNote.releasedAt} 업데이트</p>
+                  </div>
+                  <span>{selectedNote.status === 'draft' ? '미리보기' : '최신'}</span>
+                </div>
+                <div className="appPatchDivider" />
+                <div className="appPatchList">
+                  {selectedNote.patches.map((patch, index) => (
+                    <div className="appPatchRow" key={`${patch.title}-${index}`}>
+                      <div className="appPatchIcon">✓</div>
+                      <div>
+                        <strong>{patch.title}</strong>
+                        <p>{patch.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -1492,7 +1521,7 @@ function VersionNotesPage({
             role="dialog"
           >
             <p className="eyebrow">Saved</p>
-            <h2 id="version-save-title">버전 노트를 저장했어요</h2>
+            <h2 id="version-save-title">버전 노트를 작성했어요</h2>
             <p>
               {savedVersionNote.version} · {releaseTypeLabel[savedVersionNote.releaseType]}
             </p>
@@ -1625,7 +1654,7 @@ function SupportPage({
             </button>
           ))}
           {inquiries.length === 0 ? (
-            <div className="emptyTicketState">데이터 없음</div>
+            <div className="emptyTicketState">모든 문의를 처리했어요.</div>
           ) : null}
         </div>
       </aside>
@@ -1713,7 +1742,7 @@ function SupportPage({
           </div>
         </article>
       ) : (
-        <article className="panel emptyState">데이터 없음</article>
+        <article className="panel emptyState">모든 문의를 처리했어요.</article>
       )}
       {isAnswerConfirmOpen && selectedInquiry ? (
         <div className="supportAnswerBackdrop" role="presentation">
@@ -1817,6 +1846,33 @@ function getNextPatchVersion(notes: VersionNote[]) {
 
   const version = parseVersion(latest.version);
   return `${version.major}.${version.minor}.${version.patch + 1}`;
+}
+
+function createVersionNoteDraft(version: string, isFirstRelease: boolean): VersionNote {
+  return {
+    id: `version_${version}`,
+    version,
+    releasedAt: formatToday(),
+    summary: '새 버전 노트를 작성 중입니다.',
+    patches: [
+      {
+        title: '새 업데이트 제목',
+        description: '앱에 반영할 변경 내용을 입력해 주세요.',
+      },
+    ],
+    releaseType: isFirstRelease ? 'major' : 'patch',
+    status: 'draft',
+  };
+}
+
+function ensureVersionNoteDraft(notes: VersionNote[]) {
+  const sortedNotes = [...notes].sort(compareVersionNotes);
+  if (sortedNotes.some((note) => note.status === 'draft')) {
+    return sortedNotes;
+  }
+
+  const version = getNextPatchVersion(sortedNotes);
+  return [createVersionNoteDraft(version, sortedNotes.length === 0), ...sortedNotes];
 }
 
 function detectReleaseType(

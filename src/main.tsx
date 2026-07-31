@@ -1,9 +1,18 @@
 ﻿import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { AppUpdateWebView } from './AppUpdateWebView';
+import { MaintenanceWebView } from './MaintenanceWebView';
+
+const pathname = window.location.pathname.replace(/\/+$/, '');
+const Root = pathname === '/app-update'
+  ? AppUpdateWebView
+  : pathname === '/maintenance'
+    ? MaintenanceWebView
+    : App;
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <App />
+    <Root />
   </React.StrictMode>,
 );

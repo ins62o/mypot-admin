@@ -9,7 +9,11 @@ type StatCardProps = {
 };
 
 export function StatCard({ caption, icon, label, trend, value }: StatCardProps) {
-  const trendTone = trend?.includes('-') ? 'down' : 'up';
+  const trendTone = trend?.includes('동일')
+    ? 'same'
+    : trend?.includes('-')
+      ? 'down'
+      : 'up';
 
   return (
     <section className="statCard">
