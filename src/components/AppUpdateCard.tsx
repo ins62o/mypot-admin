@@ -49,7 +49,7 @@ export function AppUpdateCard({
           {config.buttonLabel}
         </a>
         {config.mode === 'optional' ? (
-          <button disabled={!preview} type="button">
+          <button disabled={preview} type="button">
             {config.dismissLabel}
           </button>
         ) : null}
