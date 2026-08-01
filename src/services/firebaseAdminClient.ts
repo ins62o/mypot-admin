@@ -15,9 +15,12 @@ import type {
   AdminPocket,
   AdminPocketMember,
   AdminUser,
+  AppUpdateConfig,
+  AppUpdateRelease,
   DatabaseBackup,
   DatabaseBackupStatus,
   DatabaseRestoreOperation,
+  MaintenanceConfig,
   SupportInquiry,
   VersionNote,
 } from '../types/admin';
@@ -123,6 +126,119 @@ export async function loadAdminVersionNotes(
   return result.notes;
 }
 
+export async function loadAdminAppUpdateConfig(
+  environment: DatabaseEnvironment = 'production',
+): Promise<AppUpdateConfig> {
+  const result = await callAdminFunction<{ config: AppUpdateConfig }>(
+    'getAdminAppUpdateConfig',
+    { environment },
+  );
+  return result.config;
+}
+
+export async function saveAdminAppUpdateConfig(
+  config: AppUpdateConfig,
+  environment: DatabaseEnvironment = 'production',
+): Promise<AppUpdateConfig> {
+  const result = await callAdminFunction<{ config: AppUpdateConfig }>(
+    'saveAdminAppUpdateConfig',
+    { ...config, environment },
+  );
+  return result.config;
+}
+
+export async function loadAdminAppUpdateReleases(
+  environment: DatabaseEnvironment = 'production',
+): Promise<AppUpdateRelease[]> {
+  const result = await callAdminFunction<{ releases: AppUpdateRelease[] }>(
+    'listAdminAppUpdateReleases',
+    { environment },
+  );
+  return result.releases;
+}
+
+export async function deleteLatestAdminAppUpdateRelease(
+  releaseId: string,
+  environment: DatabaseEnvironment = 'production',
+): Promise<AppUpdateConfig> {
+  const result = await callAdminFunction<{
+    config: AppUpdateConfig;
+    deletedId: string;
+  }>('deleteLatestAdminAppUpdateRelease', { environment, releaseId });
+  return result.config;
+}
+
+async function callDevelopmentPublicFunction<T>(name: string): Promise<T> {
+  const response = await fetch(
+    `https://asia-northeast3-mypot-dev-8558a.cloudfunctions.net/${name}`,
+    {
+      body: JSON.stringify({ data: {} }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    },
+  );
+  const payload = (await response.json()) as {
+    data?: T;
+    result?: T;
+  };
+  const result = payload.data ?? payload.result;
+  if (!response.ok || !result) {
+    throw new Error('개발 공개 설정을 불러오지 못했어요.');
+  }
+  return result;
+}
+
+export async function loadPublishedAppUpdateConfig(
+  environment: DatabaseEnvironment = 'production',
+): Promise<AppUpdateConfig> {
+  if (environment === 'development') {
+    const result = await callDevelopmentPublicFunction<{ config: AppUpdateConfig }>(
+      'getPublishedAppUpdate',
+    );
+    return result.config;
+  }
+  const result = await callAdminFunction<{ config: AppUpdateConfig }>(
+    'getPublishedAppUpdate',
+  );
+  return result.config;
+}
+
+export async function loadAdminMaintenanceConfig(
+  environment: DatabaseEnvironment = 'production',
+): Promise<MaintenanceConfig> {
+  const result = await callAdminFunction<{ config: MaintenanceConfig }>(
+    'getAdminMaintenanceConfig',
+    { environment },
+  );
+  return result.config;
+}
+
+export async function saveAdminMaintenanceConfig(
+  config: MaintenanceConfig,
+  environment: DatabaseEnvironment = 'production',
+): Promise<MaintenanceConfig> {
+  const result = await callAdminFunction<{ config: MaintenanceConfig }>(
+    'saveAdminMaintenanceConfig',
+    { ...config, environment },
+  );
+  return result.config;
+}
+
+export async function loadPublishedMaintenanceConfig(
+  environment: DatabaseEnvironment = 'production',
+): Promise<MaintenanceConfig> {
+  if (environment === 'development') {
+    const result = await callDevelopmentPublicFunction<{ config: MaintenanceConfig }>(
+      'getPublishedMaintenance',
+    );
+    return result.config;
+  }
+  const result = await callAdminFunction<{ config: MaintenanceConfig }>(
+    'getPublishedMaintenance',
+  );
+  return result.config;
+}
+
 export async function saveAdminVersionNote(
   note: VersionNote,
   environment: DatabaseEnvironment = 'production',
@@ -203,5 +319,3 @@ async function callAdminFunction<TResponse>(name: string, payload?: unknown) {
   const result = await callable(payload ?? {});
   return result.data;
 }
-
-

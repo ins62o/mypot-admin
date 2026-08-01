@@ -49,6 +49,50 @@ export type VersionNote = {
   status: 'draft' | 'published';
 };
 
+export type AppUpdateMode = 'optional' | 'required';
+
+export type AppUpdatePlatformConfig = {
+  latestVersion: string;
+  minimumVersion: string;
+  storeUrl: string;
+};
+
+export type AppUpdateConfig = {
+  buttonLabel: string;
+  dismissLabel: string;
+  enabled: boolean;
+  highlights: string[];
+  mode: AppUpdateMode;
+  platforms: {
+    android: AppUpdatePlatformConfig;
+    ios: AppUpdatePlatformConfig;
+  };
+  publishedAt: string | null;
+  schemaVersion: 1;
+  summary: string;
+  title: string;
+};
+
+export type AppUpdateRelease = AppUpdateConfig & {
+  id: string;
+};
+
+export type MaintenanceStatus = 'scheduled' | 'in_progress' | 'extended';
+
+export type MaintenanceConfig = {
+  blocksApp: boolean;
+  buttonLabel: string;
+  enabled: boolean;
+  endsAt: string;
+  publishedAt: string | null;
+  schemaVersion: 1;
+  startsAt: string;
+  status: MaintenanceStatus;
+  statusPageUrl: string;
+  summary: string;
+  title: string;
+};
+
 export type SupportInquiryStatus = 'waiting' | 'answered';
 
 export type SupportAttachment = {
@@ -108,7 +152,4 @@ export type SupportInquiry = {
   answer?: string;
   answeredAt?: string;
 };
-
-
-
 
