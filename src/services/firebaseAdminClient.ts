@@ -27,6 +27,11 @@ import type {
 
 export type DatabaseEnvironment = 'development' | 'production';
 
+type RawSupportInquiry = Omit<SupportInquiry, 'attachments' | 'status'> & {
+  attachments?: SupportInquiry['attachments'] | null;
+  status?: string | null;
+};
+
 const firebaseConfig: FirebaseOptions = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
@@ -256,11 +261,11 @@ export async function deleteAdminVersionNote(
 export async function loadAdminSupportInquiries(
   environment: DatabaseEnvironment = 'production',
 ): Promise<SupportInquiry[]> {
-  const result = await callAdminFunction<{ inquiries: SupportInquiry[] }>(
+  const result = await callAdminFunction<{ inquiries?: RawSupportInquiry[] }>(
     'listAdminSupportInquiries',
     { environment },
   );
-  return result.inquiries;
+  return (result.inquiries ?? []).map(normalizeSupportInquiry);
 }
 
 export async function loadAdminDatabaseStatus(
@@ -318,4 +323,12 @@ async function callAdminFunction<TResponse>(name: string, payload?: unknown) {
   const callable = httpsCallable<unknown, TResponse>(firebaseFunctions, name);
   const result = await callable(payload ?? {});
   return result.data;
+}
+
+function normalizeSupportInquiry(inquiry: RawSupportInquiry): SupportInquiry {
+  return {
+    ...inquiry,
+    attachments: Array.isArray(inquiry.attachments) ? inquiry.attachments : [],
+    status: inquiry.status === 'answered' ? 'answered' : 'waiting',
+  };
 }

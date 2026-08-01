@@ -171,22 +171,25 @@ function App() {
         setSelectedVersionId(fallbackNotes[0].id);
       }
       if (loadedInquiries.status === 'fulfilled') {
-        setSupportInquiries(
-          loadedInquiries.value.filter((inquiry) => inquiry.status === 'waiting'),
-        );
+        setSupportInquiries(filterOpenSupportInquiries(loadedInquiries.value));
+      } else {
+        setSupportInquiries([]);
       }
       if (loadedMetrics.status === 'fulfilled') {
         setDashboardMetrics(loadedMetrics.value);
       }
 
-      if (
-        loadedUsers.status === 'rejected' ||
-        loadedPockets.status === 'rejected'
-      ) {
+      if (loadedUsers.status === 'rejected' || loadedPockets.status === 'rejected') {
         setUsers([]);
         setPockets([]);
         setDataSourceStatus('error');
         setFirebaseStatusMessage(`${environmentLabel} Firebase 데이터 호출 실패`);
+        return;
+      }
+
+      if (loadedInquiries.status === 'rejected') {
+        setDataSourceStatus('error');
+        setFirebaseStatusMessage(`${environmentLabel} Firebase 문의 호출 실패`);
         return;
       }
 
@@ -207,6 +210,34 @@ function App() {
       // 환경 선택은 브라우저 저장소를 사용할 수 없어도 현재 세션에서 유지됩니다.
     }
   }
+
+  useEffect(() => {
+    if (!isAuthenticated || !isFirebaseConfigured || page !== 'support') {
+      return;
+    }
+
+    let isMounted = true;
+
+    loadAdminSupportInquiries(databaseEnvironment)
+      .then((inquiries) => {
+        if (isMounted) {
+          setSupportInquiries(filterOpenSupportInquiries(inquiries));
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setSupportInquiries([]);
+          setDataSourceStatus('error');
+          setFirebaseStatusMessage(
+            `${databaseEnvironment === 'production' ? '운영' : '개발'} Firebase 문의 호출 실패`,
+          );
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [databaseEnvironment, isAuthenticated, page]);
 
   useEffect(() => {
     if (!isAuthenticated || !isFirebaseConfigured) {
@@ -320,7 +351,9 @@ function App() {
           </div>
           <div>
             <strong>마이폿 관리자</strong>
-            <span>{databaseEnvironment === 'development' ? '개발 콘솔' : '운영 콘솔'}</span>
+            <span className={`consoleTag ${databaseEnvironment}`}>
+              {databaseEnvironment === 'development' ? '개발 콘솔' : '운영 콘솔'}
+            </span>
           </div>
         </div>
 
@@ -1906,6 +1939,10 @@ function detectReleaseType(
 function paginate<T>(items: T[], page: number) {
   const startIndex = (page - 1) * PAGE_SIZE;
   return items.slice(startIndex, startIndex + PAGE_SIZE);
+}
+
+function filterOpenSupportInquiries(inquiries: SupportInquiry[]) {
+  return inquiries.filter((inquiry) => inquiry.status !== 'answered');
 }
 
 function UserAvatar({ displayName, photoURL }: UserAvatarProps) {

@@ -230,6 +230,29 @@ button {
   line-height: 18px;
 }
 
+.consoleTag {
+  align-items: center;
+  background: #fff3c4;
+  border: 1px solid rgba(246, 200, 76, 0.78);
+  border-radius: 999px;
+  color: #5a371c;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  min-height: 24px;
+  padding: 0 9px;
+  white-space: nowrap;
+}
+
+.brandBlock .consoleTag {
+  color: #5a371c;
+  display: inline-flex;
+  font-size: 11px;
+  line-height: 1;
+  margin-top: 5px;
+}
+
 .navList {
   display: grid;
   gap: 12px;
@@ -689,6 +712,46 @@ h3 {
   overflow-x: auto;
 }
 
+.dashboardTableWrap {
+  padding-bottom: 22px;
+  scrollbar-color: #fff3c4 #fffdf7;
+  scrollbar-width: thin;
+}
+
+.dashboardTableWrap::-webkit-scrollbar {
+  height: 14px;
+  width: 14px;
+}
+
+.dashboardTableWrap::-webkit-scrollbar-track {
+  background: #fffdf7;
+  border: 1px solid #f5e8cc;
+  border-radius: 999px;
+}
+
+.dashboardTableWrap::-webkit-scrollbar-thumb {
+  background: #fff3c4;
+  border: 2px solid rgba(246, 200, 76, 0.78);
+  border-radius: 999px;
+  min-width: 72px;
+}
+
+.dashboardTableWrap::-webkit-scrollbar-thumb:hover {
+  background: #f6c84c;
+  border-color: #f6c84c;
+}
+
+.dashboardTableWrap::-webkit-scrollbar-thumb:active {
+  background: #f6c84c;
+  border-color: #f6c84c;
+}
+
+.dashboardTableWrap::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
 table {
   border-collapse: collapse;
   min-width: 760px;
@@ -1073,7 +1136,8 @@ th {
 }
 
 .dashboardTableWrap {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .compactTable table {
@@ -1136,7 +1200,7 @@ th {
 }
 
 .paginationHidden {
-  visibility: hidden;
+  display: none;
 }
 
 .pagination span {
@@ -1197,11 +1261,7 @@ tbody tr {
   width: 24px;
 }
 
-/* Pocket table breathing room and trend tones */
-#pockets .dashboardTableWrap {
-  padding-bottom: 22px;
-}
-
+/* Dashboard trend tones */
 .statTrend {
   color: #15876d;
 }
@@ -3804,6 +3864,10 @@ tbody tr {
 }
 
 .databaseList > .databaseBackupItem {
+  border-bottom: 1px solid #f5e8cc;
+}
+
+.databaseList > .databaseBackupItem:last-child {
   border-bottom: 1px solid #f5e8cc;
 }
 
