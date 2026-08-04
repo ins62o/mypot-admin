@@ -5,6 +5,7 @@ import {
   Database,
   FileText,
   Inbox,
+  ShieldAlert,
   Layers3,
   LoaderCircle,
   MessageCircle,
@@ -19,12 +20,13 @@ import kakaoLogo from './assets/social/kakao-login.svg';
 import { AdminSearch } from './components/AdminSearch';
 import { AppNoticeManagement } from './components/AppNoticeManagement';
 import { StatCard } from './components/StatCard';
-import type { AdminDashboardMetrics, AdminPocket, AdminPocketMember, AdminUser, DatabaseBackup, DatabaseBackupStatus, SupportInquiry, VersionNote, VersionReleaseType } from './types/admin';
+import type { AdminDashboardMetrics, AdminPocket, AdminPocketMember, AdminUser, ContentReport, DatabaseBackup, DatabaseBackupStatus, ModerationAction, SupportInquiry, VersionNote, VersionReleaseType } from './types/admin';
 import {
   answerSupportInquiry as answerSupportInquiryRemote,
   deleteAdminVersionNote,
   isFirebaseConfigured,
   loadAdminDashboardMetrics,
+  loadAdminContentReports,
   loadAdminDatabaseStatus,
   loadAdminPockets,
   loadAdminPocketMembers,
@@ -33,6 +35,7 @@ import {
   loadAdminVersionNotes,
   loginAdminWithEmail,
   logoutAdmin,
+  resolveAdminContentReport,
   saveAdminVersionNote,
   startAdminDatabaseRestore,
   subscribeToAdminSession,
@@ -45,7 +48,7 @@ const DATABASE_ENVIRONMENT_STORAGE_KEY = 'mypot-admin-database-environment';
 const ADMIN_LOGIN_ALIAS = 'mypot';
 const ADMIN_LOGIN_EMAIL = 'mypot.support@gmail.com';
 
-type AdminPage = 'dashboard' | 'database' | 'updates' | 'versions' | 'support';
+type AdminPage = 'dashboard' | 'database' | 'moderation' | 'updates' | 'versions' | 'support';
 type PocketSortKey = 'memberCount' | 'recordCount' | 'level' | 'status';
 type DataSourceStatus = 'firebase' | 'loading' | 'error';
 
@@ -68,6 +71,7 @@ const pocketSortLabels: Record<PocketSortKey, string> = {
 const pageTitle: Record<AdminPage, string> = {
   database: 'DB 현황',
   dashboard: '대시보드',
+  moderation: '신고 관리',
   support: '1:1 문의',
   updates: '앱 공지 관리',
   versions: '버전 노트',
@@ -87,6 +91,7 @@ function App() {
     ensureVersionNoteDraft([]),
   );
   const [supportInquiries, setSupportInquiries] = useState<SupportInquiry[]>([]);
+  const [contentReports, setContentReports] = useState<ContentReport[]>([]);
   const [dataSourceStatus, setDataSourceStatus] = useState<DataSourceStatus>('loading');
   const [firebaseStatusMessage, setFirebaseStatusMessage] = useState('운영 Firebase 연결 대기 중');
   const [databaseDataSourceStatus, setDatabaseDataSourceStatus] =
@@ -123,6 +128,7 @@ function App() {
   const waitingInquiryCount = supportInquiries.filter(
     (inquiry) => inquiry.status === 'waiting',
   ).length;
+  const openReportCount = contentReports.filter((report) => report.status === 'open').length;
 
   useEffect(() => {
     return subscribeToAdminSession((user) => {
@@ -146,7 +152,8 @@ function App() {
       loadAdminVersionNotes(databaseEnvironment),
       loadAdminSupportInquiries(databaseEnvironment),
       loadAdminDashboardMetrics(databaseEnvironment),
-    ]).then(([loadedUsers, loadedPockets, loadedNotes, loadedInquiries, loadedMetrics]) => {
+      loadAdminContentReports(databaseEnvironment),
+    ]).then(([loadedUsers, loadedPockets, loadedNotes, loadedInquiries, loadedMetrics, loadedReports]) => {
       if (!isMounted) {
         return;
       }
@@ -178,6 +185,7 @@ function App() {
       if (loadedMetrics.status === 'fulfilled') {
         setDashboardMetrics(loadedMetrics.value);
       }
+      if (loadedReports.status === 'fulfilled') setContentReports(loadedReports.value);
 
       if (
         loadedUsers.status === 'rejected' ||
@@ -339,6 +347,10 @@ function App() {
 
           <section className="navGroup" aria-label="운영 관리">
             <p className="navGroupLabel">운영 관리</p>
+            <button className={page === 'moderation' ? 'active' : ''} type="button" onClick={() => setPage('moderation')}>
+              <span className="navIcon"><ShieldAlert size={18} /></span><span>신고 관리</span>
+              {openReportCount > 0 ? <span className="navCount">{openReportCount}</span> : null}
+            </button>
             <button
               className={page === 'updates' ? 'active' : ''}
               type="button"
@@ -449,6 +461,13 @@ function App() {
             waitingCount={waitingInquiryCount}
           />
         ) : null}
+        {page === 'moderation' ? (
+          <ModerationPage reports={contentReports} onResolve={async (reportId, action, note) => {
+            await resolveAdminContentReport(reportId, action, note, databaseEnvironment);
+            setContentReports(await loadAdminContentReports(databaseEnvironment));
+            setPockets(await loadAdminPockets(databaseEnvironment));
+          }} />
+        ) : null}
       </main>
       {isLogoutDialogOpen ? (
         <div className="logoutConfirmBackdrop" role="presentation">
@@ -490,6 +509,43 @@ type DashboardPageProps = {
   userWeeklyDelta: number;
   users: AdminUser[];
 };
+
+function ModerationPage({ reports, onResolve }: { reports: ContentReport[]; onResolve: (id: string, action: ModerationAction, note: string) => Promise<void> }) {
+  const [selected, setSelected] = useState<ContentReport | null>(null);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const reasonLabels: Record<string, string> = { abuse: '욕설·괴롭힘', harassment: '괴롭힘', inappropriate: '부적절한 콘텐츠', other: '기타', spam: '스팸' };
+  const typeLabels = { chatMessage: '채팅', feed: '피드', user: '사용자' };
+  async function act(action: ModerationAction) {
+    if (!selected) return;
+    const destructive = action === 'eject_user' || action === 'delete_and_eject';
+    if (destructive && !window.confirm(`${selected.targetName} 님을 ${selected.pocketName}에서 강제 퇴장할까요? 이 작업은 즉시 적용됩니다.`)) return;
+    setBusy(true); setError('');
+    try { await onResolve(selected.id, action, note); setSelected(null); setNote(''); }
+    catch { setError('처리하지 못했어요. 신고 상태와 관리자 권한을 확인해 주세요.'); }
+    finally { setBusy(false); }
+  }
+  return <section className="moderationLayout">
+    <article className="panel moderationList">
+      <div className="panelHeader"><div><p className="eyebrow">Safety</p><h2>접수된 신고</h2></div><span className="moderationCount">미처리 {reports.filter(r => r.status === 'open').length}건</span></div>
+      <div className="tableWrap"><table><thead><tr><th>상태</th><th>유형</th><th>신고 대상</th><th>주머니</th><th>사유</th><th>접수 시각</th></tr></thead><tbody>
+        {reports.map(report => <tr className="moderationRow" key={report.id} onClick={() => { setSelected(report); setNote(''); setError(''); }}>
+          <td><span className={`reportStatus ${report.status}`}>{report.status === 'open' ? '미처리' : report.status === 'dismissed' ? '기각' : '처리 완료'}</span></td><td>{typeLabels[report.targetType]}</td><td><strong>{report.targetName}</strong><small className="tableSubText">{report.targetUid}</small></td><td>{report.pocketName}</td><td>{reasonLabels[report.reason] ?? report.reason}</td><td>{report.createdAt ? new Date(report.createdAt).toLocaleString('ko-KR') : '-'}</td>
+        </tr>)}
+        {!reports.length ? <tr><td className="emptyTableCell" colSpan={6}>접수된 신고가 없습니다.</td></tr> : null}
+      </tbody></table></div>
+    </article>
+    {selected ? <div className="pocketMembersBackdrop" role="presentation"><section className="pocketMembersDialog moderationDialog" role="dialog" aria-modal="true">
+      <div className="panelHeader"><div><p className="eyebrow">Report detail</p><h2>신고 내용 확인</h2></div><button className="pocketMembersClose" onClick={() => setSelected(null)} type="button">닫기</button></div>
+      <div className="moderationDetail"><dl><div><dt>신고자</dt><dd>{selected.reporterName} · {selected.reporterUid}</dd></div><div><dt>신고 대상</dt><dd>{selected.targetName} · {selected.targetUid}</dd></div><div><dt>주머니</dt><dd>{selected.pocketName} · {selected.pocketId}</dd></div><div><dt>사유</dt><dd>{reasonLabels[selected.reason] ?? selected.reason}</dd></div></dl>
+      {selected.details ? <div className="evidenceBox"><strong>추가 설명</strong><p>{selected.details}</p></div> : null}
+      <div className="evidenceBox"><strong>신고 당시 원문</strong><pre>{JSON.stringify(selected.evidence, null, 2)}</pre></div>
+      {selected.status === 'open' ? <><label className="moderationNote">관리자 메모<textarea value={note} onChange={e => setNote(e.target.value)} maxLength={1000} placeholder="판단 근거와 조치 내용을 남겨 주세요." /></label>{error ? <p className="loginError">{error}</p> : null}<div className="moderationActions"><button disabled={busy} onClick={() => act('dismiss')} type="button">신고 기각</button>{selected.targetType !== 'user' ? <button disabled={busy} onClick={() => act('delete_content')} type="button">콘텐츠 삭제</button> : null}<button className="danger" disabled={busy} onClick={() => act('eject_user')} type="button">강제 퇴장</button>{selected.targetType !== 'user' ? <button className="danger" disabled={busy} onClick={() => act('delete_and_eject')} type="button">삭제 후 강제 퇴장</button> : null}</div></> : <p className="moderationResolved">이미 처리된 신고입니다.</p>}
+      </div>
+    </section></div> : null}
+  </section>;
+}
 
 function DashboardPage({
   activePocketCount,

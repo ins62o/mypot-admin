@@ -32,6 +32,14 @@ export type AdminDashboardMetrics = {
   userWeeklyDelta: number;
 };
 
+export type ModerationAction = 'dismiss' | 'delete_content' | 'eject_user' | 'delete_and_eject';
+export type ContentReport = {
+  createdAt: string; details: string; evidence: Record<string, unknown>; id: string;
+  pocketId: string; pocketName: string; reason: string; reporterName: string; reporterUid: string;
+  resolution?: ModerationAction; resolvedAt?: string; status: 'dismissed' | 'open' | 'resolved';
+  targetId: string; targetName: string; targetType: 'chatMessage' | 'feed' | 'user'; targetUid: string;
+};
+
 export type VersionPatchNote = {
   description: string;
   title: string;
@@ -152,4 +160,3 @@ export type SupportInquiry = {
   answer?: string;
   answeredAt?: string;
 };
-

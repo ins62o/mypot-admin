@@ -21,6 +21,8 @@ import type {
   DatabaseBackupStatus,
   DatabaseRestoreOperation,
   MaintenanceConfig,
+  ContentReport,
+  ModerationAction,
   SupportInquiry,
   VersionNote,
 } from '../types/admin';
@@ -115,6 +117,15 @@ export async function loadAdminDashboardMetrics(
     { environment },
   );
   return result.metrics;
+}
+
+export async function loadAdminContentReports(environment: DatabaseEnvironment = 'production'): Promise<ContentReport[]> {
+  const result = await callAdminFunction<{ reports: ContentReport[] }>('listAdminContentReports', { environment });
+  return result.reports;
+}
+
+export async function resolveAdminContentReport(reportId: string, action: ModerationAction, adminNote: string, environment: DatabaseEnvironment = 'production') {
+  return callAdminFunction<{ reportId: string; status: 'dismissed' | 'resolved' }>('resolveAdminContentReport', { action, adminNote, environment, reportId });
 }
 
 export async function loadAdminVersionNotes(

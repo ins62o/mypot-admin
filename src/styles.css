@@ -442,6 +442,32 @@ button {
   grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
 }
 
+.moderationLayout { padding: 24px; }
+.moderationList { min-height: 540px; }
+.moderationCount { background: #fff3c4; border-radius: 999px; color: #94690e; font-size: 12px; font-weight: 800; padding: 8px 12px; }
+.moderationRow { cursor: pointer; }
+.moderationRow:hover { background: #fff8e8; }
+.reportStatus { border-radius: 999px; display: inline-flex; font-size: 11px; font-weight: 800; padding: 7px 9px; }
+.reportStatus.open { background: #ffe8ed; color: #b24d62; }
+.reportStatus.resolved { background: #eaf8f5; color: #15876d; }
+.reportStatus.dismissed { background: #f0ece5; color: #7a6c5d; }
+.moderationDialog { max-height: 88vh; max-width: 760px; overflow: auto; width: min(760px, calc(100vw - 40px)); }
+.moderationDetail { display: grid; gap: 18px; padding: 22px; }
+.moderationDetail dl { display: grid; gap: 8px; margin: 0; }
+.moderationDetail dl div { display: grid; grid-template-columns: 110px 1fr; }
+.moderationDetail dt { color: #8b7355; font-size: 12px; font-weight: 800; }
+.moderationDetail dd { margin: 0; }
+.evidenceBox { background: #fffdf7; border: 1px solid #ead7b7; border-radius: 10px; padding: 14px; }
+.evidenceBox p { margin-bottom: 0; white-space: pre-wrap; }
+.evidenceBox pre { color: #5a371c; font-family: inherit; max-height: 220px; overflow: auto; white-space: pre-wrap; }
+.moderationNote { color: #7a4d28; display: grid; font-size: 12px; font-weight: 800; gap: 8px; }
+.moderationNote textarea { background: #fffdf7; border: 1px solid #ead7b7; border-radius: 10px; min-height: 88px; padding: 12px; resize: vertical; }
+.moderationActions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.moderationActions button { background: #fff; border: 1px solid #ead7b7; border-radius: 9px; color: #7a4d28; font-weight: 800; padding: 10px 13px; }
+.moderationActions button.danger { background: #b24d62; border-color: #b24d62; color: #fff; }
+.moderationActions button:disabled { opacity: .5; }
+.moderationResolved { background: #eaf8f5; border-radius: 10px; color: #15876d; padding: 14px; }
+
 .supportWaitingCard {
   background: #fff3c4;
   border: 1px solid rgba(246, 200, 76, 0.7);
