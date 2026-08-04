@@ -474,22 +474,72 @@ button {
 .reportStatus.open { background: #ffe8ed; color: #b24d62; }
 .reportStatus.resolved { background: #eaf8f5; color: #15876d; }
 .reportStatus.dismissed { background: #f0ece5; color: #7a6c5d; }
-.moderationDialog { max-height: 88vh; max-width: 760px; overflow: auto; width: min(760px, calc(100vw - 40px)); }
+.reportCountBadge { background: #f0ece5; border-radius: 999px; color: #7a6c5d; display: inline-flex; font-size: 12px; font-weight: 800; padding: 7px 9px; }
+.reportCountBadge.hasReports { background: #ffe8ed; color: #b24d62; }
+.pocketMembersDialog.moderationDialog { max-height: 88vh; max-width: 760px; overflow: auto; scrollbar-color: #c9a875 #fffdf7; scrollbar-width: thin; width: min(760px, calc(100vw - 40px)); }
+.pocketMembersDialog.moderationDialog::-webkit-scrollbar { width: 12px; }
+.pocketMembersDialog.moderationDialog::-webkit-scrollbar-track { background: #fffdf7; border-left: 1px solid #f5e8cc; border-radius: 999px; }
+.pocketMembersDialog.moderationDialog::-webkit-scrollbar-thumb { background: #d6b783; border: 3px solid #fffdf7; border-radius: 999px; }
+.pocketMembersDialog.moderationDialog::-webkit-scrollbar-thumb:hover { background: #bd925a; }
 .moderationDetail { display: grid; gap: 18px; padding: 22px; }
-.moderationDetail dl { display: grid; gap: 8px; margin: 0; }
-.moderationDetail dl div { display: grid; grid-template-columns: 110px 1fr; }
-.moderationDetail dt { color: #8b7355; font-size: 12px; font-weight: 800; }
-.moderationDetail dd { margin: 0; }
+.moderationDetail > dl { display: grid; gap: 8px; margin: 0; }
+.moderationDetail > dl > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); }
+.moderationDetail > dl dt { color: #8b7355; font-size: 12px; font-weight: 800; }
+.moderationDetail > dl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .evidenceBox { background: #fffdf7; border: 1px solid #ead7b7; border-radius: 10px; padding: 14px; }
+.evidenceBox > strong { display: block; margin-bottom: 16px; }
 .evidenceBox p { margin-bottom: 0; white-space: pre-wrap; }
-.evidenceBox pre { color: #5a371c; font-family: inherit; max-height: 220px; overflow: auto; white-space: pre-wrap; }
-.moderationNote { color: #7a4d28; display: grid; font-size: 12px; font-weight: 800; gap: 8px; }
-.moderationNote textarea { background: #fffdf7; border: 1px solid #ead7b7; border-radius: 10px; min-height: 88px; padding: 12px; resize: vertical; }
+.evidenceSummary { display: grid; gap: 16px; }
+.evidenceSummaryMeta { align-items: stretch; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) auto; }
+.evidenceSummaryMeta > div { align-items: center; background: #fffaf0; border: 1px solid #f5e8cc; border-radius: 8px; display: flex; gap: 10px; min-height: 44px; padding: 10px 12px; }
+.evidenceSummaryMeta span,
+.evidenceContentSection > span { color: #8b7355; font-size: 12px; font-weight: 800; }
+.evidenceSummaryMeta strong { color: #5a371c; font-size: 14px; line-height: 20px; }
+.evidenceTypeTags { display: flex; flex-wrap: wrap; gap: 6px; }
+.evidenceTypeTag { background: #fff3c4; border: 1px solid rgba(246, 200, 76, 0.7); border-radius: 999px; color: #94690e; display: inline-flex; font-size: 12px; font-weight: 900; padding: 6px 9px; }
+.evidenceContentSection { display: grid; gap: 8px; }
+.evidenceContentValue { background: #ffffff; border: 1px solid #f5e8cc; border-radius: 8px; color: #5a371c; display: grid; gap: 12px; min-height: 78px; padding: 14px; }
+.evidenceContentItem { min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.evidenceRows,
+.evidenceNestedRows { display: grid; gap: 0; margin: 0; }
+.evidenceRows > div,
+.evidenceNestedRows > div { align-items: center; border-top: 1px solid #f5e8cc; display: grid; gap: 10px; grid-template-columns: 120px minmax(0, 1fr); min-height: 48px; padding: 11px 0; }
+.evidenceRows > div:first-child,
+.evidenceNestedRows > div:first-child { border-top: 0; padding-top: 0; }
+.evidenceRows dt,
+.evidenceNestedRows dt { color: #8b7355; font-size: 12px; font-weight: 800; }
+.evidenceRows dd,
+.evidenceNestedRows dd { color: #5a371c; margin: 0; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.evidenceNestedRows { background: #fffaf0; border: 1px solid #f5e8cc; border-radius: 8px; padding: 10px; }
+.evidenceValueList { display: flex; flex-wrap: wrap; gap: 10px; }
+.evidenceAudioValue { align-items: center; display: grid; gap: 10px; grid-template-columns: minmax(320px, 420px) auto; width: 100%; }
+.evidenceAudioValue audio { display: block; height: 38px; min-width: 320px; width: 100%; }
+.evidenceImageValue { align-items: center; color: #2f6bb2; display: inline-flex; font-weight: 800; gap: 10px; text-decoration: none; }
+.evidenceImageValue img { aspect-ratio: 1; border: 1px solid #ead7b7; border-radius: 8px; height: 72px; object-fit: cover; width: 72px; }
+.evidenceImageValue:hover span { text-decoration: underline; }
+.evidenceVideoValue { display: block; max-width: 360px; }
+.evidenceVideoValue video { background: #2d2117; border-radius: 8px; max-height: 220px; width: 100%; }
+.evidenceAudioValue small { color: #9a8060; font-size: 12px; font-weight: 800; }
+.evidenceLink { color: #2f6bb2; font-weight: 800; text-decoration: none; }
+.evidenceLink:hover { text-decoration: underline; }
+.emptyEvidenceValue { color: #9a8060; }
 .moderationActions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .moderationActions button { background: #fff; border: 1px solid #ead7b7; border-radius: 9px; color: #7a4d28; font-weight: 800; padding: 10px 13px; }
 .moderationActions button.danger { background: #b24d62; border-color: #b24d62; color: #fff; }
 .moderationActions button:disabled { opacity: .5; }
 .moderationResolved { background: #eaf8f5; border-radius: 10px; color: #15876d; padding: 14px; }
+
+@media (max-width: 640px) {
+  .moderationLayout { padding: 14px; }
+  .pocketMembersDialog.moderationDialog { width: calc(100vw - 28px); }
+  .moderationDetail { padding: 18px; }
+  .evidenceSummaryMeta { grid-template-columns: 1fr; }
+  .evidenceAudioValue { grid-template-columns: 1fr; }
+  .evidenceAudioValue audio { min-width: 0; width: 100%; }
+  .moderationDetail > dl > div,
+  .evidenceRows > div,
+  .evidenceNestedRows > div { gap: 4px; grid-template-columns: 1fr; }
+}
 
 .supportWaitingCard {
   background: #fff3c4;
@@ -2361,6 +2411,13 @@ tbody tr {
 .pocketMembersContent {
   color: #76583a;
   padding: 12px 18px 18px;
+}
+
+.pocketMembersLoading {
+  align-items: center;
+  display: flex;
+  min-height: 120px;
+  justify-content: center;
 }
 
 .pocketMembersList {

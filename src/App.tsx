@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState, type FormEvent } from 'react';
+﻿import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import {
   Check,
   ChevronDown,
@@ -51,6 +51,8 @@ const ADMIN_LOGIN_EMAIL = 'mypot.support@gmail.com';
 type AdminPage = 'dashboard' | 'database' | 'moderation' | 'updates' | 'versions' | 'support';
 type PocketSortKey = 'memberCount' | 'recordCount' | 'level' | 'status';
 type DataSourceStatus = 'firebase' | 'loading' | 'error';
+type EvidenceContentItem = { key: string; value: ReactNode };
+type EvidenceRow = { key: string; label: string; value: ReactNode };
 
 const statusLabel = {
   active: '운영중',
@@ -76,6 +78,855 @@ const pageTitle: Record<AdminPage, string> = {
   updates: '앱 공지 관리',
   versions: '버전 노트',
 };
+
+const evidenceFieldLabels: Record<string, string> = {
+  authorDisplayName: '작성자',
+  authorPhotoURL: '작성자 프로필 사진',
+  authorUid: '작성자 계정 ID',
+  audioDuration: '음성 길이',
+  audioDurationMs: '음성 길이',
+  audioDurationSeconds: '음성 길이',
+  audioFileURL: '음성 기록',
+  audioFileUrl: '음성 기록',
+  audioURL: '음성 기록',
+  audioUrl: '음성 기록',
+  body: '본문',
+  commentCount: '댓글 수',
+  content: '내용',
+  contentType: '콘텐츠 유형',
+  createdAt: '작성일',
+  displayName: '이름',
+  duration: '음성 길이',
+  durationMs: '음성 길이',
+  durationSeconds: '음성 길이',
+  email: '이메일',
+  imageURL: '사진',
+  imageUrl: '사진',
+  imageURLs: '사진',
+  imageUrls: '사진',
+  mediaUrl: '첨부 미디어',
+  mediaUrls: '첨부 미디어',
+  mediaType: '콘텐츠 유형',
+  message: '메시지',
+  photoURL: '프로필 사진',
+  photoUrl: '프로필 사진',
+  photoUrls: '첨부 사진',
+  profileImageUrl: '프로필 사진',
+  recordingDuration: '음성 길이',
+  recordingDurationMs: '음성 길이',
+  recordingDurationSeconds: '음성 길이',
+  recordingURL: '음성 기록',
+  recordingUrl: '음성 기록',
+  text: '내용',
+  title: '제목',
+  transcript: '음성 변환 내용',
+  transcription: '음성 변환 내용',
+  uid: '계정 ID',
+  updatedAt: '수정일',
+  videoDuration: '영상 길이',
+  videoDurationMs: '영상 길이',
+  videoDurationSeconds: '영상 길이',
+  videoFileURL: '영상',
+  videoFileURLs: '영상',
+  videoFileUrl: '영상',
+  videoFileUrls: '영상',
+  videoURL: '영상',
+  videoURLs: '영상',
+  videoUrl: '영상',
+  videoUrls: '영상',
+  voiceDuration: '음성 길이',
+  voiceDurationMs: '음성 길이',
+  voiceDurationSeconds: '음성 길이',
+  voiceRecordURL: '음성 기록',
+  voiceRecordUrl: '음성 기록',
+  voiceURL: '음성 기록',
+  voiceUrl: '음성 기록',
+};
+
+const evidenceFieldOrder = [
+  'title',
+  'content',
+  'text',
+  'message',
+  'body',
+  'transcript',
+  'transcription',
+  'audioUrl',
+  'audioURL',
+  'audioFileUrl',
+  'audioFileURL',
+  'voiceUrl',
+  'voiceURL',
+  'voiceRecordUrl',
+  'voiceRecordURL',
+  'recordingUrl',
+  'recordingURL',
+  'videoUrl',
+  'videoURL',
+  'videoUrls',
+  'videoURLs',
+  'videoFileUrl',
+  'videoFileURL',
+  'videoFileUrls',
+  'videoFileURLs',
+  'fileUrl',
+  'fileURL',
+  'fileUrls',
+  'fileURLs',
+  'attachmentUrl',
+  'attachmentURL',
+  'attachmentUrls',
+  'attachmentURLs',
+  'media',
+  'mediaUrl',
+  'mediaUrls',
+  'mediaFile',
+  'mediaFiles',
+  'attachments',
+  'files',
+  'assets',
+  'audioDuration',
+  'audioDurationMs',
+  'audioDurationSeconds',
+  'voiceDuration',
+  'voiceDurationMs',
+  'voiceDurationSeconds',
+  'recordingDuration',
+  'recordingDurationMs',
+  'recordingDurationSeconds',
+  'duration',
+  'durationMs',
+  'durationSeconds',
+  'videoDuration',
+  'videoDurationMs',
+  'videoDurationSeconds',
+  'authorDisplayName',
+  'displayName',
+  'authorUid',
+  'uid',
+  'email',
+  'commentCount',
+  'imageUrls',
+  'imageURLs',
+  'imageUrl',
+  'imageURL',
+  'photoUrls',
+  'photoUrl',
+  'photoURL',
+  'profileImageUrl',
+  'authorPhotoURL',
+  'mediaType',
+  'contentType',
+  'createdAt',
+  'updatedAt',
+] as const;
+
+const emptyContentKeys = new Set(['body', 'content', 'message', 'text']);
+const evidenceContentTextKeys = ['title', 'content', 'text', 'message', 'body', 'transcript', 'transcription'] as const;
+const evidenceContentMediaKeys = [
+  'audioUrl',
+  'audioURL',
+  'audioFileUrl',
+  'audioFileURL',
+  'voiceUrl',
+  'voiceURL',
+  'voiceRecordUrl',
+  'voiceRecordURL',
+  'recordingUrl',
+  'recordingURL',
+  'videoUrl',
+  'videoURL',
+  'videoUrls',
+  'videoURLs',
+  'videoFileUrl',
+  'videoFileURL',
+  'videoFileUrls',
+  'videoFileURLs',
+  'fileUrl',
+  'fileURL',
+  'fileUrls',
+  'fileURLs',
+  'attachmentUrl',
+  'attachmentURL',
+  'attachmentUrls',
+  'attachmentURLs',
+  'imageUrls',
+  'imageURLs',
+  'imageUrl',
+  'imageURL',
+  'photoUrls',
+  'media',
+  'mediaUrl',
+  'mediaUrls',
+  'mediaFile',
+  'mediaFiles',
+  'attachments',
+  'files',
+  'assets',
+] as const;
+const hiddenEvidenceKeys = new Set([
+  'createdWeekKey',
+  'authorUid',
+  'authorPhotoURL',
+  'commentCount',
+  'email',
+  'id',
+  'metadata',
+  'photoURL',
+  'photoUrl',
+  'pocketId',
+  'profileImageUrl',
+  'searchKeywords',
+  'sortKey',
+  'targetId',
+  'uid',
+  'updatedWeekKey',
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isUrl(value: string) {
+  return /^https?:\/\//i.test(value);
+}
+
+function isAudioTypeValue(value: unknown) {
+  return typeof value === 'string' && /audio|voice|recording|음성/i.test(value);
+}
+
+function isImageTypeValue(value: unknown) {
+  return typeof value === 'string' && /image|photo|picture|사진|이미지/i.test(value);
+}
+
+function isVideoTypeValue(value: unknown) {
+  return typeof value === 'string' && /video|movie|영상|동영상/i.test(value);
+}
+
+function isMediaTypeFieldKey(key: string) {
+  const lowerKey = key.toLowerCase();
+  return (
+    lowerKey.includes('mimetype') ||
+    lowerKey === 'attachmenttype' ||
+    lowerKey === 'assettype' ||
+    lowerKey === 'contentkind' ||
+    lowerKey === 'contenttype' ||
+    lowerKey === 'filetype' ||
+    lowerKey === 'mediakind' ||
+    lowerKey === 'mediatype' ||
+    lowerKey === 'mime' ||
+    lowerKey === 'mimetype' ||
+    lowerKey === 'posttype' ||
+    lowerKey === 'recordtype' ||
+    lowerKey === 'type'
+  );
+}
+
+function isAudioEvidenceKey(key: string) {
+  const lowerKey = key.toLowerCase();
+  return (
+    lowerKey.includes('audio') ||
+    lowerKey.includes('voice') ||
+    lowerKey.includes('recording') ||
+    lowerKey === 'recordurl' ||
+    lowerKey === 'recordurls' ||
+    lowerKey === 'recordfileurl' ||
+    lowerKey === 'recordfileurls'
+  );
+}
+
+function isContentImageEvidenceKey(key: string) {
+  const lowerKey = key.toLowerCase();
+  return (
+    lowerKey === 'imageurl' ||
+    lowerKey === 'imageurls' ||
+    lowerKey === 'images' ||
+    lowerKey === 'image' ||
+    lowerKey === 'photourls' ||
+    lowerKey === 'photos'
+  );
+}
+
+function isImageEvidenceKey(key: string) {
+  const lowerKey = key.toLowerCase();
+  return isContentImageEvidenceKey(key) || lowerKey.includes('image') || lowerKey.includes('photo');
+}
+
+function isProfileImageEvidenceKey(key: string) {
+  const lowerKey = key.toLowerCase();
+  const hasImageHint = lowerKey.includes('image') || lowerKey.includes('photo') || lowerKey.includes('picture') || lowerKey.includes('url');
+  return (
+    lowerKey.includes('avatar') ||
+    lowerKey.includes('profile') ||
+    (lowerKey.includes('author') && hasImageHint) ||
+    (lowerKey.includes('writer') && hasImageHint) ||
+    (lowerKey.includes('sender') && hasImageHint) ||
+    (lowerKey.includes('user') && lowerKey.includes('profile') && hasImageHint)
+  );
+}
+
+function isVideoEvidenceKey(key: string) {
+  const lowerKey = key.toLowerCase();
+  return lowerKey.includes('clip') || lowerKey.includes('movie') || lowerKey.includes('video');
+}
+
+function isGenericMediaValueKey(key: string) {
+  const lowerKey = key.toLowerCase();
+  return (
+    lowerKey.includes('asset') ||
+    lowerKey.includes('attachment') ||
+    lowerKey.includes('downloadurl') ||
+    lowerKey.includes('file') ||
+    lowerKey.includes('media') ||
+    lowerKey.includes('storageurl') ||
+    lowerKey === 'url' ||
+    lowerKey === 'urls' ||
+    lowerKey === 'uri' ||
+    lowerKey === 'uris'
+  );
+}
+
+function isAudioDurationKey(key: string) {
+  const lowerKey = key.toLowerCase();
+  return lowerKey.includes('duration') && (lowerKey.includes('audio') || lowerKey.includes('voice') || lowerKey.includes('recording') || lowerKey === 'duration' || lowerKey === 'durationms' || lowerKey === 'durationseconds');
+}
+
+function isVideoDurationKey(key: string) {
+  const lowerKey = key.toLowerCase();
+  return lowerKey.includes('duration') && (lowerKey.includes('video') || lowerKey.includes('movie'));
+}
+
+function isDurationKey(key: string) {
+  return key.toLowerCase().includes('duration');
+}
+
+function hasMeaningfulEvidenceValue(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (Array.isArray(value)) return value.some(hasMeaningfulEvidenceValue);
+  if (isRecord(value)) return Object.values(value).some(hasMeaningfulEvidenceValue);
+  return true;
+}
+
+function hasEvidenceMediaType(evidence: Record<string, unknown>, matcher: (value: unknown) => boolean) {
+  return Object.entries(evidence).some(([key, value]) => isMediaTypeFieldKey(key) && matcher(value));
+}
+
+function hasAudioEvidence(evidence: Record<string, unknown>) {
+  const hasExplicitImageOrVideoType = hasEvidenceMediaType(evidence, isImageTypeValue) || hasEvidenceMediaType(evidence, isVideoTypeValue);
+  return Object.entries(evidence).some(([key, value]) => {
+    if (isAudioEvidenceKey(key) && hasMeaningfulEvidenceValue(value)) return true;
+    if (isMediaTypeFieldKey(key) && isAudioTypeValue(value)) return true;
+    if (!hasExplicitImageOrVideoType && isGenericMediaValueKey(key) && valueContainsMediaKind(value, 'audio')) return true;
+    return false;
+  });
+}
+
+function hasImageEvidence(evidence: Record<string, unknown>) {
+  const hasExplicitAudioOrVideoType = hasEvidenceMediaType(evidence, isAudioTypeValue) || hasEvidenceMediaType(evidence, isVideoTypeValue);
+  return Object.entries(evidence).some(([key, value]) => {
+    if (isProfileImageEvidenceKey(key)) return false;
+    if (isContentImageEvidenceKey(key) && hasMeaningfulEvidenceValue(value)) return true;
+    if (isMediaTypeFieldKey(key) && isImageTypeValue(value)) return true;
+    if (!hasExplicitAudioOrVideoType && isGenericMediaValueKey(key) && valueContainsMediaKind(value, 'image')) return true;
+    return false;
+  });
+}
+
+function hasVideoEvidence(evidence: Record<string, unknown>) {
+  const hasExplicitAudioOrImageType = hasEvidenceMediaType(evidence, isAudioTypeValue) || hasEvidenceMediaType(evidence, isImageTypeValue);
+  return Object.entries(evidence).some(([key, value]) => {
+    if (isVideoEvidenceKey(key) && hasMeaningfulEvidenceValue(value)) return true;
+    if (isMediaTypeFieldKey(key) && isVideoTypeValue(value)) return true;
+    if (!hasExplicitAudioOrImageType && isGenericMediaValueKey(key) && valueContainsMediaKind(value, 'video')) return true;
+    return false;
+  });
+}
+
+function hasMediaAttachmentEvidence(evidence: Record<string, unknown>) {
+  return Object.entries(evidence).some(([key, value]) => {
+    const lowerKey = key.toLowerCase();
+    if (!hasMeaningfulEvidenceValue(value)) return false;
+    if (isProfileImageEvidenceKey(key)) return false;
+    if (isAudioEvidenceKey(key) || isContentImageEvidenceKey(key) || isVideoEvidenceKey(key)) return true;
+    if (isGenericMediaValueKey(key) && (hasAudioEvidence(evidence) || hasImageEvidence(evidence) || hasVideoEvidence(evidence) || valueContainsAnyMediaKind(value))) return true;
+    return false;
+  });
+}
+
+function getUrlMediaKind(url: string): 'audio' | 'image' | 'video' | null {
+  const pathname = url.split(/[?#]/)[0].toLowerCase();
+  if (/\.(aac|aif|aiff|flac|m4a|mp3|ogg|opus|wav)$/.test(pathname)) return 'audio';
+  if (/\.(avif|bmp|gif|heic|heif|jpe?g|png|webp)$/.test(pathname)) return 'image';
+  if (/\.(3gp|m4v|mov|mp4|mpeg|mpg|ogv|webm)$/.test(pathname)) return 'video';
+  return null;
+}
+
+function valueContainsMediaKind(value: unknown, kind: 'audio' | 'image' | 'video'): boolean {
+  if (typeof value === 'string') return isUrl(value.trim()) && getUrlMediaKind(value.trim()) === kind;
+  if (Array.isArray(value)) return value.some((item) => valueContainsMediaKind(item, kind));
+  if (isRecord(value)) {
+    return Object.entries(value).some(([key, item]) => {
+      if (isMediaTypeFieldKey(key)) {
+        if (kind === 'audio') return isAudioTypeValue(item);
+        if (kind === 'image') return isImageTypeValue(item);
+        return isVideoTypeValue(item);
+      }
+
+      if (kind === 'audio' && isAudioEvidenceKey(key) && hasMeaningfulEvidenceValue(item)) return true;
+      if (kind === 'image' && isContentImageEvidenceKey(key) && hasMeaningfulEvidenceValue(item)) return true;
+      if (kind === 'video' && isVideoEvidenceKey(key) && hasMeaningfulEvidenceValue(item)) return true;
+
+      return isGenericMediaValueKey(key) && valueContainsMediaKind(item, kind);
+    });
+  }
+  return false;
+}
+
+function valueContainsAnyMediaKind(value: unknown) {
+  return valueContainsMediaKind(value, 'audio') || valueContainsMediaKind(value, 'image') || valueContainsMediaKind(value, 'video');
+}
+
+function shouldRenderAudioValue(key: string, evidence?: Record<string, unknown>) {
+  const lowerKey = key.toLowerCase();
+  const value = evidence?.[key];
+  if (isGenericMediaValueKey(key) && evidence && (hasImageEvidence(evidence) || hasVideoEvidence(evidence))) return false;
+  return isAudioEvidenceKey(key) || valueContainsMediaKind(value, 'audio') || (isGenericMediaValueKey(key) && Boolean(evidence && hasAudioEvidence(evidence)));
+}
+
+function shouldRenderImageValue(key: string, evidence?: Record<string, unknown>) {
+  const value = evidence?.[key];
+  if (isProfileImageEvidenceKey(key)) return false;
+  if (isGenericMediaValueKey(key) && evidence && (hasAudioEvidence(evidence) || hasVideoEvidence(evidence))) return false;
+  return isImageEvidenceKey(key) || valueContainsMediaKind(value, 'image') || (isGenericMediaValueKey(key) && Boolean(evidence && hasImageEvidence(evidence)));
+}
+
+function shouldRenderVideoValue(key: string, evidence?: Record<string, unknown>) {
+  const value = evidence?.[key];
+  if (isGenericMediaValueKey(key) && evidence && (hasAudioEvidence(evidence) || hasImageEvidence(evidence))) return false;
+  return isVideoEvidenceKey(key) || valueContainsMediaKind(value, 'video') || (isGenericMediaValueKey(key) && Boolean(evidence && hasVideoEvidence(evidence)));
+}
+
+function formatEvidenceDate(value: unknown) {
+  const timestamp = getEvidenceTimestamp(value);
+  return timestamp === null ? null : new Date(timestamp).toLocaleString('ko-KR');
+}
+
+function getEvidenceTimestamp(value: unknown) {
+  if (typeof value === 'string' || typeof value === 'number') {
+    const timestamp = new Date(value).getTime();
+    return Number.isNaN(timestamp) ? null : timestamp;
+  }
+
+  if (isRecord(value) && typeof value.seconds === 'number') {
+    return value.seconds * 1000;
+  }
+
+  return null;
+}
+
+function evidenceLinkLabel(key: string, index?: number) {
+  const countLabel = typeof index === 'number' ? ` ${index + 1}` : '';
+  const lowerKey = key.toLowerCase();
+  if (isAudioEvidenceKey(key)) return `음성${countLabel} 듣기`;
+  if (isVideoEvidenceKey(key)) return `영상${countLabel} 보기`;
+  if (lowerKey.includes('image') || lowerKey.includes('photo')) return `사진${countLabel} 보기`;
+  if (lowerKey.includes('media')) return `미디어${countLabel} 보기`;
+  return `링크${countLabel} 열기`;
+}
+
+function findUrlInRecord(record: Record<string, unknown>) {
+  const urlKeys = ['url', 'uri', 'downloadUrl', 'downloadURL', 'fileUrl', 'fileURL', 'audioUrl', 'audioURL', 'voiceUrl', 'voiceURL', 'imageUrl', 'imageURL', 'photoUrl', 'photoURL', 'videoUrl', 'videoURL', 'mediaUrl', 'mediaURL', 'storageUrl', 'storageURL'];
+  for (const key of urlKeys) {
+    const value = record[key];
+    const url = findUrlInValue(value);
+    if (url) return url;
+  }
+
+  for (const value of Object.values(record)) {
+    const url = findUrlInValue(value);
+    if (url) return url;
+  }
+
+  return null;
+}
+
+function findUrlInValue(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return isUrl(trimmed) ? trimmed : null;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const url = findUrlInValue(item);
+      if (url) return url;
+    }
+  }
+
+  if (isRecord(value)) {
+    return findUrlInRecord(value);
+  }
+
+  return null;
+}
+
+function findDurationInRecord(record: Record<string, unknown>) {
+  const durationKeys = ['duration', 'durationMs', 'durationSeconds', 'audioDuration', 'audioDurationMs', 'audioDurationSeconds', 'voiceDuration', 'voiceDurationMs', 'voiceDurationSeconds', 'recordingDuration', 'recordingDurationMs', 'recordingDurationSeconds', 'videoDuration', 'videoDurationMs', 'videoDurationSeconds'];
+  for (const key of durationKeys) {
+    const duration = formatEvidenceDuration(key, record[key]);
+    if (duration) return duration;
+  }
+
+  return null;
+}
+
+function formatEvidenceDuration(key: string, value: unknown) {
+  if (!isDurationKey(key)) return null;
+
+  const numericValue =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && value.trim()
+        ? Number(value)
+        : NaN;
+
+  if (!Number.isFinite(numericValue)) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+  }
+
+  const lowerKey = key.toLowerCase();
+  const seconds = lowerKey.includes('ms') ? Math.round(numericValue / 1000) : Math.round(numericValue);
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  if (minutes <= 0) return `${remainingSeconds}초`;
+  if (remainingSeconds === 0) return `${minutes}분`;
+  return `${minutes}분 ${remainingSeconds}초`;
+}
+
+function ImageEvidenceValue({ index, url }: { index?: number; url: string }) {
+  return <a className="evidenceImageValue" href={url} rel="noreferrer" target="_blank">
+    <img src={url} alt={evidenceLinkLabel('imageUrl', index)} loading="lazy" />
+    <span>{evidenceLinkLabel('imageUrl', index)}</span>
+  </a>;
+}
+
+function VideoEvidenceValue({ url }: { url: string }) {
+  return <div className="evidenceVideoValue">
+    <video controls preload="metadata" src={url}>
+      <a href={url} rel="noreferrer" target="_blank">영상 보기</a>
+    </video>
+  </div>;
+}
+
+function AudioEvidenceValue({ duration, index, url }: { duration?: string | null; index?: number; url: string }) {
+  return <div className="evidenceAudioValue">
+    <audio controls preload="none" src={url}>
+      <a href={url} rel="noreferrer" target="_blank">{evidenceLinkLabel('audioUrl', index)}</a>
+    </audio>
+    {duration ? <small>{duration}</small> : null}
+  </div>;
+}
+
+function formatImageEvidenceValue(key: string, value: unknown, index?: number): ReactNode | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (isUrl(trimmed)) return <ImageEvidenceValue index={index} url={trimmed} />;
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    const items = value
+      .map((item, itemIndex) => formatImageEvidenceValue(key, item, itemIndex))
+      .filter((item): item is ReactNode => item !== null);
+
+    return items.length ? <div className="evidenceValueList">{items.map((item, itemIndex) => <div key={`${key}-${itemIndex}`}>{item}</div>)}</div> : null;
+  }
+
+  if (isRecord(value)) {
+    const imageUrl = findUrlInRecord(value);
+    if (imageUrl) return <ImageEvidenceValue index={index} url={imageUrl} />;
+  }
+
+  return null;
+}
+
+function formatVideoEvidenceValue(key: string, value: unknown, index?: number): ReactNode | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (isUrl(trimmed)) return <VideoEvidenceValue url={trimmed} />;
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    const items = value
+      .map((item, itemIndex) => formatVideoEvidenceValue(key, item, itemIndex))
+      .filter((item): item is ReactNode => item !== null);
+
+    return items.length ? <div className="evidenceValueList">{items.map((item, itemIndex) => <div key={`${key}-${itemIndex}`}>{item}</div>)}</div> : null;
+  }
+
+  if (isRecord(value)) {
+    const videoUrl = findUrlInRecord(value);
+    if (videoUrl) {
+      return <VideoEvidenceValue url={videoUrl} />;
+    }
+  }
+
+  return null;
+}
+
+function formatAudioEvidenceValue(key: string, value: unknown, index?: number): ReactNode | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (isUrl(trimmed)) return <AudioEvidenceValue index={index} url={trimmed} />;
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    const items = value
+      .map((item, itemIndex) => formatAudioEvidenceValue(key, item, itemIndex))
+      .filter((item): item is ReactNode => item !== null);
+
+    return items.length ? <div className="evidenceValueList">{items.map((item, itemIndex) => <div key={`${key}-${itemIndex}`}>{item}</div>)}</div> : null;
+  }
+
+  if (isRecord(value)) {
+    const audioUrl = findUrlInRecord(value);
+    if (audioUrl) {
+      return <AudioEvidenceValue duration={findDurationInRecord(value)} index={index} url={audioUrl} />;
+    }
+  }
+
+  return null;
+}
+
+function formatEvidenceValue(key: string, value: unknown, index?: number, evidence?: Record<string, unknown>): ReactNode | null {
+  if (value === null || value === undefined) return null;
+
+  if (shouldRenderAudioValue(key, evidence)) {
+    return formatAudioEvidenceValue(key, value, index);
+  }
+
+  if (shouldRenderVideoValue(key, evidence)) {
+    return formatVideoEvidenceValue(key, value, index);
+  }
+
+  if (shouldRenderImageValue(key, evidence)) {
+    return formatImageEvidenceValue(key, value, index);
+  }
+
+  const durationValue = formatEvidenceDuration(key, value);
+  if (durationValue) return durationValue;
+
+  const dateValue = key.endsWith('At') ? formatEvidenceDate(value) : null;
+  if (dateValue) return dateValue;
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return emptyContentKeys.has(key) ? <span className="emptyEvidenceValue">내용 없음</span> : null;
+    }
+    if (isUrl(trimmed)) {
+      return <a className="evidenceLink" href={trimmed} rel="noreferrer" target="_blank">{evidenceLinkLabel(key, index)}</a>;
+    }
+    return trimmed;
+  }
+
+  if (typeof value === 'number') return value.toLocaleString('ko-KR');
+  if (typeof value === 'boolean') return value ? '예' : '아니요';
+
+  if (Array.isArray(value)) {
+    const items = value
+      .map((item, itemIndex) => formatEvidenceValue(key, item, itemIndex, evidence))
+      .filter((item): item is ReactNode => item !== null);
+
+    return items.length ? <div className="evidenceValueList">{items.map((item, itemIndex) => <div key={`${key}-${itemIndex}`}>{item}</div>)}</div> : null;
+  }
+
+  if (isRecord(value)) {
+    const nestedRows = buildEvidenceRows(value);
+    return nestedRows.length ? <dl className="evidenceNestedRows">{nestedRows.map(row => <div key={row.key}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}</dl> : null;
+  }
+
+  return String(value);
+}
+
+function getEvidenceFieldLabel(key: string, evidence: Record<string, unknown>) {
+  if (shouldRenderAudioValue(key, evidence)) return '음성 기록';
+  if (shouldRenderVideoValue(key, evidence)) return '영상';
+  if (shouldRenderImageValue(key, evidence)) return evidenceFieldLabels[key] ?? '사진';
+  if (isDurationKey(key) && hasVideoEvidence(evidence)) return '영상 길이';
+  if (isDurationKey(key) && hasAudioEvidence(evidence)) return '음성 길이';
+  if (isVideoDurationKey(key)) return '영상 길이';
+  if (isAudioDurationKey(key)) return '음성 길이';
+  if (isAudioTypeValue(evidence[key]) || isImageTypeValue(evidence[key]) || isVideoTypeValue(evidence[key])) return '콘텐츠 유형';
+  return evidenceFieldLabels[key] ?? null;
+}
+
+function shouldHideEvidenceRow(key: string, value: unknown, evidence: Record<string, unknown>, targetName?: string) {
+  if (hiddenEvidenceKeys.has(key)) return true;
+  if (isProfileImageEvidenceKey(key)) return true;
+
+  if (
+    emptyContentKeys.has(key) &&
+    typeof value === 'string' &&
+    !value.trim() &&
+    hasMediaAttachmentEvidence(evidence)
+  ) {
+    return true;
+  }
+
+  if (
+    isMediaTypeFieldKey(key) &&
+    (isAudioTypeValue(value) || isImageTypeValue(value) || isVideoTypeValue(value)) &&
+    hasMediaAttachmentEvidence(evidence)
+  ) {
+    return true;
+  }
+
+  const normalizedTargetName = targetName?.trim();
+  if (
+    normalizedTargetName &&
+    (key === 'authorDisplayName' || key === 'displayName') &&
+    typeof value === 'string' &&
+    value.trim() === normalizedTargetName
+  ) {
+    return true;
+  }
+
+  if (key === 'updatedAt') {
+    const updatedAt = getEvidenceTimestamp(value);
+    const createdAt = getEvidenceTimestamp(evidence.createdAt);
+    return updatedAt !== null && createdAt !== null && updatedAt === createdAt;
+  }
+
+  return false;
+}
+
+function buildEvidenceRows(evidence: Record<string, unknown>, targetName?: string): EvidenceRow[] {
+  const displayedKeys = new Set<string>();
+  const orderedKeys = [
+    ...evidenceFieldOrder.filter(key => Object.prototype.hasOwnProperty.call(evidence, key)),
+    ...Object.keys(evidence).filter(key => !evidenceFieldOrder.includes(key as typeof evidenceFieldOrder[number])),
+  ];
+
+  return orderedKeys.reduce<EvidenceRow[]>((rows, key) => {
+    if (displayedKeys.has(key) || shouldHideEvidenceRow(key, evidence[key], evidence, targetName)) return rows;
+
+    const label = getEvidenceFieldLabel(key, evidence);
+    if (!label) return rows;
+
+    const value = formatEvidenceValue(key, evidence[key], undefined, evidence);
+    if (value === null) return rows;
+
+    displayedKeys.add(key);
+    rows.push({ key, label, value });
+    return rows;
+  }, []);
+}
+
+function getEvidenceContentTypeLabels(evidence: Record<string, unknown>) {
+  const labels: string[] = [];
+
+  if (hasAudioEvidence(evidence)) labels.push('음성');
+  if (hasVideoEvidence(evidence)) labels.push('영상');
+  if (hasImageEvidence(evidence)) labels.push('사진');
+
+  if (!labels.length && evidenceContentTextKeys.some((key) => hasMeaningfulEvidenceValue(evidence[key]))) {
+    labels.push('텍스트');
+  }
+
+  return labels.length ? labels : ['게시물'];
+}
+
+function buildEvidenceContentItems(evidence: Record<string, unknown>): EvidenceContentItem[] {
+  const items: EvidenceContentItem[] = [];
+  const displayedKeys = new Set<string>();
+
+  evidenceContentTextKeys.forEach((key) => {
+    if (!Object.prototype.hasOwnProperty.call(evidence, key) || !hasMeaningfulEvidenceValue(evidence[key])) {
+      return;
+    }
+
+    const value = formatEvidenceValue(key, evidence[key], undefined, evidence);
+    if (value === null) return;
+
+    displayedKeys.add(key);
+    items.push({ key, value });
+  });
+
+  evidenceContentMediaKeys.forEach((key) => {
+    if (
+      displayedKeys.has(key) ||
+      !Object.prototype.hasOwnProperty.call(evidence, key) ||
+      !hasMeaningfulEvidenceValue(evidence[key])
+    ) {
+      return;
+    }
+
+    const value = formatEvidenceValue(key, evidence[key], undefined, evidence);
+    if (value === null) return;
+
+    displayedKeys.add(key);
+    items.push({ key, value });
+  });
+
+  Object.keys(evidence).forEach((key) => {
+    if (
+      displayedKeys.has(key) ||
+      hiddenEvidenceKeys.has(key) ||
+      evidenceContentTextKeys.includes(key as typeof evidenceContentTextKeys[number]) ||
+      !hasMeaningfulEvidenceValue(evidence[key]) ||
+      (!shouldRenderAudioValue(key, evidence) && !shouldRenderVideoValue(key, evidence) && !shouldRenderImageValue(key, evidence))
+    ) {
+      return;
+    }
+
+    const value = formatEvidenceValue(key, evidence[key], undefined, evidence);
+    if (value === null) return;
+
+    displayedKeys.add(key);
+    items.push({ key, value });
+  });
+
+  return items;
+}
+
+function EvidenceSummary({ createdAt, evidence }: { createdAt?: string; evidence: Record<string, unknown> }) {
+  const contentItems = buildEvidenceContentItems(evidence);
+  const createdAtLabel = formatEvidenceDate(evidence.createdAt) ?? formatEvidenceDate(createdAt) ?? '-';
+  const typeLabels = getEvidenceContentTypeLabels(evidence);
+
+  return <div className="evidenceSummary">
+    <div className="evidenceSummaryMeta">
+      <div>
+        <span>작성일</span>
+        <strong>{createdAtLabel}</strong>
+      </div>
+      <div>
+        <span>유형</span>
+        <div className="evidenceTypeTags">
+          {typeLabels.map((label) => <span className="evidenceTypeTag" key={label}>{label}</span>)}
+        </div>
+      </div>
+    </div>
+    <section className="evidenceContentSection">
+      <span>내용</span>
+      <div className="evidenceContentValue">
+        {contentItems.length ? (
+          contentItems.map((item) => <div className="evidenceContentItem" key={item.key}>{item.value}</div>)
+        ) : (
+          <span className="emptyEvidenceValue">내용 없음</span>
+        )}
+      </div>
+    </section>
+  </div>;
+}
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -129,6 +980,10 @@ function App() {
     (inquiry) => inquiry.status === 'waiting',
   ).length;
   const openReportCount = contentReports.filter((report) => report.status === 'open').length;
+  const reportCountByUserId = useMemo(
+    () => buildReportCountByUserId(contentReports),
+    [contentReports],
+  );
 
   useEffect(() => {
     return subscribeToAdminSession((user) => {
@@ -451,6 +1306,7 @@ function App() {
             pendingDeletionPocketCount={pendingDeletionPocketCount}
             pockets={pockets}
             pocketWeeklyDelta={dashboardMetrics.pocketWeeklyDelta}
+            reportCountByUserId={reportCountByUserId}
             userWeeklyDelta={dashboardMetrics.userWeeklyDelta}
             users={users}
           />
@@ -539,42 +1395,63 @@ type DashboardPageProps = {
   pendingDeletionPocketCount: number;
   pockets: AdminPocket[];
   pocketWeeklyDelta: number;
+  reportCountByUserId: Record<string, number>;
   userWeeklyDelta: number;
   users: AdminUser[];
 };
 
 function ModerationPage({ reports, onResolve }: { reports: ContentReport[]; onResolve: (id: string, action: ModerationAction, note: string) => Promise<void> }) {
   const [selected, setSelected] = useState<ContentReport | null>(null);
-  const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const reasonLabels: Record<string, string> = { abuse: '욕설·괴롭힘', harassment: '괴롭힘', inappropriate: '부적절한 콘텐츠', other: '기타', spam: '스팸' };
+  const [reportPage, setReportPage] = useState(1);
+  const reasonLabels: Record<string, string> = {
+    abuse: '괴롭힘 또는 욕설',
+    harassment: '괴롭힘 또는 욕설',
+    hate: '혐오 표현',
+    inappropriate: '부적절한 콘텐츠',
+    other: '기타',
+    sexual: '성적인 콘텐츠',
+    spam: '스팸 또는 광고',
+    violence: '폭력 또는 위협',
+  };
   const typeLabels = { chatMessage: '채팅', feed: '피드', user: '사용자' };
+  const reportPageCount = Math.max(1, Math.ceil(reports.length / PAGE_SIZE));
+  const visibleReports = paginate(reports, reportPage);
+
+  useEffect(() => {
+    setReportPage((currentPage) => Math.min(currentPage, reportPageCount));
+  }, [reportPageCount]);
+
   async function act(action: ModerationAction) {
     if (!selected) return;
-    const destructive = action === 'eject_user' || action === 'delete_and_eject';
-    if (destructive && !window.confirm(`${selected.targetName} 님을 ${selected.pocketName}에서 강제 퇴장할까요? 이 작업은 즉시 적용됩니다.`)) return;
     setBusy(true); setError('');
-    try { await onResolve(selected.id, action, note); setSelected(null); setNote(''); }
+    try { await onResolve(selected.id, action, ''); setSelected(null); }
     catch { setError('처리하지 못했어요. 신고 상태와 관리자 권한을 확인해 주세요.'); }
     finally { setBusy(false); }
   }
   return <section className="moderationLayout">
     <article className="panel moderationList">
-      <div className="panelHeader"><div><p className="eyebrow">Safety</p><h2>접수된 신고</h2></div><span className="moderationCount">미처리 {reports.filter(r => r.status === 'open').length}건</span></div>
+      <div className="panelHeader"><div><p className="eyebrow">신고</p><h2>접수된 신고</h2></div><span className="moderationCount">미처리 {reports.filter(r => r.status === 'open').length}건</span></div>
       <div className="tableWrap"><table><thead><tr><th>상태</th><th>유형</th><th>신고 대상</th><th>주머니</th><th>사유</th><th>접수 시각</th></tr></thead><tbody>
-        {reports.map(report => <tr className="moderationRow" key={report.id} onClick={() => { setSelected(report); setNote(''); setError(''); }}>
-          <td><span className={`reportStatus ${report.status}`}>{report.status === 'open' ? '미처리' : report.status === 'dismissed' ? '기각' : '처리 완료'}</span></td><td>{typeLabels[report.targetType]}</td><td><strong>{report.targetName}</strong><small className="tableSubText">{report.targetUid}</small></td><td>{report.pocketName}</td><td>{reasonLabels[report.reason] ?? report.reason}</td><td>{report.createdAt ? new Date(report.createdAt).toLocaleString('ko-KR') : '-'}</td>
+        {visibleReports.map(report => <tr className="moderationRow" key={report.id} onClick={() => { setSelected(report); setError(''); }}>
+          <td><span className={`reportStatus ${report.status}`}>{report.status === 'open' ? '미처리' : report.status === 'dismissed' ? '문제 없음' : '처리 완료'}</span></td><td>{typeLabels[report.targetType]}</td><td><strong>{report.targetName}</strong></td><td>{report.pocketName}</td><td>{reasonLabels[report.reason] ?? report.reason}</td><td>{report.createdAt ? new Date(report.createdAt).toLocaleString('ko-KR') : '-'}</td>
         </tr>)}
         {!reports.length ? <tr><td className="emptyTableCell" colSpan={6}>접수된 신고가 없습니다.</td></tr> : null}
       </tbody></table></div>
+      <Pagination
+        currentPage={reportPage}
+        onChange={setReportPage}
+        pageCount={reportPageCount}
+        totalCount={reports.length}
+      />
     </article>
     {selected ? <div className="pocketMembersBackdrop" role="presentation"><section className="pocketMembersDialog moderationDialog" role="dialog" aria-modal="true">
-      <div className="panelHeader"><div><p className="eyebrow">Report detail</p><h2>신고 내용 확인</h2></div><button className="pocketMembersClose" onClick={() => setSelected(null)} type="button">닫기</button></div>
-      <div className="moderationDetail"><dl><div><dt>신고자</dt><dd>{selected.reporterName} · {selected.reporterUid}</dd></div><div><dt>신고 대상</dt><dd>{selected.targetName} · {selected.targetUid}</dd></div><div><dt>주머니</dt><dd>{selected.pocketName} · {selected.pocketId}</dd></div><div><dt>사유</dt><dd>{reasonLabels[selected.reason] ?? selected.reason}</dd></div></dl>
+      <div className="panelHeader"><div><p className="eyebrow">신고 상세</p><h2>신고 내용 확인</h2></div><button className="pocketMembersClose" onClick={() => setSelected(null)} type="button">닫기</button></div>
+      <div className="moderationDetail"><dl><div><dt>신고자</dt><dd>{selected.reporterName}</dd></div><div><dt>신고 대상</dt><dd>{selected.targetName}</dd></div><div><dt>주머니</dt><dd>{selected.pocketName}</dd></div><div><dt>사유</dt><dd>{reasonLabels[selected.reason] ?? selected.reason}</dd></div></dl>
       {selected.details ? <div className="evidenceBox"><strong>추가 설명</strong><p>{selected.details}</p></div> : null}
-      <div className="evidenceBox"><strong>신고 당시 원문</strong><pre>{JSON.stringify(selected.evidence, null, 2)}</pre></div>
-      {selected.status === 'open' ? <><label className="moderationNote">관리자 메모<textarea value={note} onChange={e => setNote(e.target.value)} maxLength={1000} placeholder="판단 근거와 조치 내용을 남겨 주세요." /></label>{error ? <p className="loginError">{error}</p> : null}<div className="moderationActions"><button disabled={busy} onClick={() => act('dismiss')} type="button">신고 기각</button>{selected.targetType !== 'user' ? <button disabled={busy} onClick={() => act('delete_content')} type="button">콘텐츠 삭제</button> : null}<button className="danger" disabled={busy} onClick={() => act('eject_user')} type="button">강제 퇴장</button>{selected.targetType !== 'user' ? <button className="danger" disabled={busy} onClick={() => act('delete_and_eject')} type="button">삭제 후 강제 퇴장</button> : null}</div></> : <p className="moderationResolved">이미 처리된 신고입니다.</p>}
+      <div className="evidenceBox"><strong>신고 당시 콘텐츠</strong><EvidenceSummary createdAt={selected.createdAt} evidence={selected.evidence} /></div>
+      {selected.status === 'open' ? <>{error ? <p className="loginError">{error}</p> : null}<div className="moderationActions"><button disabled={busy} onClick={() => act('dismiss')} type="button">문제 없음</button><button className="danger" disabled={busy} onClick={() => act('confirm_violation')} type="button">위반 처리</button></div></> : <p className="moderationResolved">이미 처리된 신고입니다.</p>}
       </div>
     </section></div> : null}
   </section>;
@@ -589,6 +1466,7 @@ function DashboardPage({
   pendingDeletionPocketCount,
   pockets,
   pocketWeeklyDelta,
+  reportCountByUserId,
   userWeeklyDelta,
   users,
 }: DashboardPageProps) {
@@ -682,13 +1560,13 @@ function DashboardPage({
         <article className="panel tallPanel" id="users">
           <div className="panelHeader">
             <div>
-              <p className="eyebrow">Users</p>
+              <p className="eyebrow">사용자</p>
               <h2>전체 사용자 목록</h2>
             </div>
             <AdminSearch
               value={userQuery}
               onChange={updateUserQuery}
-              placeholder="이름, 이메일, UID 검색"
+              placeholder="이름 검색"
             />
           </div>
 
@@ -699,6 +1577,7 @@ function DashboardPage({
                   <th>사용자</th>
                   <th>로그인</th>
                   <th>참여</th>
+                  <th>처리 신고</th>
                   <th>가입일</th>
                   <th>최근 로그인</th>
                 </tr>
@@ -714,7 +1593,6 @@ function DashboardPage({
                         />
                         <div>
                           <strong>{user.displayName}</strong>
-                          <small>{user.email}</small>
                         </div>
                       </div>
                     </td>
@@ -722,13 +1600,14 @@ function DashboardPage({
                       <ProviderBadge provider={user.provider} />
                     </td>
                     <td>{user.pocketCount}개</td>
+                    <td><ReportCountBadge count={reportCountByUserId[user.id] ?? 0} /></td>
                     <td>{user.joinedAt}</td>
                     <td>{user.lastLoginAt}</td>
                   </tr>
                 ))}
                 {visibleUsers.length === 0 ? (
                   <tr>
-                    <td className="emptyTableCell" colSpan={5}>
+                    <td className="emptyTableCell" colSpan={6}>
                       데이터 없음
                     </td>
                   </tr>
@@ -747,7 +1626,7 @@ function DashboardPage({
         <article className="panel tallPanel" id="pockets">
           <div className="panelHeader pocketPanelHeader">
             <div>
-              <p className="eyebrow">Pockets</p>
+              <p className="eyebrow">주머니</p>
               <h2>주머니 현황</h2>
             </div>
             <div className="filterGroup" aria-label="주머니 정렬">
@@ -795,7 +1674,6 @@ function DashboardPage({
                   >
                     <td>
                       <strong>{pocketItem.name}</strong>
-                      <small className="tableSubText">{pocketItem.id}</small>
                     </td>
                     <td>{pocketItem.memberCount}명</td>
                     <td>{pocketItem.recordCount}개</td>
@@ -836,7 +1714,7 @@ function DashboardPage({
           >
             <div className="panelHeader compact">
               <div>
-                <p className="eyebrow">Members</p>
+                <p className="eyebrow">참여자</p>
                 <h2 id="pocket-members-title">{selectedPocket.name} 참여자</h2>
               </div>
               <button
@@ -848,7 +1726,11 @@ function DashboardPage({
               </button>
             </div>
             <div className="pocketMembersContent">
-              {isLoadingPocketMembers ? <p>참여자 목록을 불러오는 중이에요.</p> : null}
+              {isLoadingPocketMembers ? (
+                <div className="pocketMembersLoading">
+                  <div className="sessionLoader" aria-label="참여자 목록 불러오는 중" />
+                </div>
+              ) : null}
               {pocketMembersError ? <p className="pocketMembersError">{pocketMembersError}</p> : null}
               {!isLoadingPocketMembers && !pocketMembersError ? (
                 <div className="pocketMembersList">
@@ -860,7 +1742,6 @@ function DashboardPage({
                       />
                       <div>
                         <strong>{member.displayName}</strong>
-                        <span>{member.statusMessage || '상태 메시지가 없어요.'}</span>
                       </div>
                       <small>{member.joinedAt} 참여</small>
                     </div>
@@ -2001,6 +2882,29 @@ function filterOpenSupportInquiries(inquiries: SupportInquiry[]) {
   return inquiries.filter((inquiry) => inquiry.status !== 'answered');
 }
 
+function buildReportCountByUserId(reports: ContentReport[]) {
+  return reports.reduce<Record<string, number>>((counts, report) => {
+    if (report.status !== 'resolved') {
+      return counts;
+    }
+
+    const targetUid = report.targetUid.trim();
+    const targetId = report.targetId.trim();
+    const authorUid = report.evidence.authorUid;
+    const fallbackAuthorUid = typeof authorUid === 'string' ? authorUid.trim() : '';
+    const userId =
+      targetUid ||
+      (report.targetType === 'user' ? targetId : '') ||
+      fallbackAuthorUid;
+
+    if (userId) {
+      counts[userId] = (counts[userId] ?? 0) + 1;
+    }
+
+    return counts;
+  }, {});
+}
+
 function UserAvatar({ displayName, photoURL }: UserAvatarProps) {
   if (photoURL) {
     return <img className="userAvatar" src={photoURL} alt={displayName} />;
@@ -2009,12 +2913,17 @@ function UserAvatar({ displayName, photoURL }: UserAvatarProps) {
   return <span className="userAvatarFallback">{displayName.slice(0, 1)}</span>;
 }
 
+function ReportCountBadge({ count }: { count: number }) {
+  return <span className={`reportCountBadge ${count > 0 ? 'hasReports' : ''}`}>{count.toLocaleString('ko-KR')}건</span>;
+}
+
 function ProviderBadge({ provider }: { provider: 'Kakao' | 'Apple' }) {
   const logo = provider === 'Kakao' ? kakaoLogo : appleLogo;
+  const label = provider === 'Kakao' ? '카카오' : '애플';
 
   return (
     <span className="providerLogoBadge">
-      <img src={logo} alt={provider} />
+      <img src={logo} alt={label} />
     </span>
   );
 }

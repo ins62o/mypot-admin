@@ -126,7 +126,7 @@ export async function loadAdminDashboardMetrics(
 
 export async function loadAdminContentReports(environment: DatabaseEnvironment = 'production'): Promise<ContentReport[]> {
   const result = await callAdminFunction<{ reports: ContentReport[] }>('listAdminContentReports', { environment });
-  return result.reports;
+  return result.reports.filter(isActionableContentReport);
 }
 
 export async function resolveAdminContentReport(reportId: string, action: ModerationAction, adminNote: string, environment: DatabaseEnvironment = 'production') {
@@ -342,4 +342,14 @@ function normalizeSupportInquiry(inquiry: RawSupportInquiry): SupportInquiry {
     attachments: Array.isArray(inquiry.attachments) ? inquiry.attachments : [],
     status: inquiry.status === 'answered' ? 'answered' : 'waiting',
   };
+}
+
+function isActionableContentReport(report: ContentReport) {
+  const details = report.details.trim();
+  const isProfileBlockEvent =
+    report.targetType === 'user' &&
+    report.reason === 'other' &&
+    details.includes('프로필에서 직접 차단');
+
+  return !isProfileBlockEvent;
 }

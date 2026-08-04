@@ -32,7 +32,7 @@ export type AdminDashboardMetrics = {
   userWeeklyDelta: number;
 };
 
-export type ModerationAction = 'dismiss' | 'delete_content' | 'eject_user' | 'delete_and_eject';
+export type ModerationAction = 'confirm_violation' | 'dismiss' | 'delete_content' | 'eject_user' | 'delete_and_eject';
 export type ContentReport = {
   createdAt: string; details: string; evidence: Record<string, unknown>; id: string;
   pocketId: string; pocketName: string; reason: string; reporterName: string; reporterUid: string;
