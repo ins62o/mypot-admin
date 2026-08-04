@@ -1,4 +1,11 @@
+<<<<<<< HEAD
+.env
+.env.local
+.env.*
+!.env.example
+=======
 .env*
+>>>>>>> 6950836dd546d6350e6ff995472ce203b655f161
 node_modules
 dist
 *.log
