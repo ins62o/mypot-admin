@@ -476,6 +476,40 @@ button {
 .reportStatus.dismissed { background: #f0ece5; color: #7a6c5d; }
 .reportCountBadge { background: #f0ece5; border-radius: 999px; color: #7a6c5d; display: inline-flex; font-size: 12px; font-weight: 800; padding: 7px 9px; }
 .reportCountBadge.hasReports { background: #ffe8ed; color: #b24d62; }
+.userStatusBadge { align-items: center; border: 1px solid; border-radius: 999px; display: inline-flex; font-size: 11px; font-weight: 900; justify-content: center; min-width: 46px; padding: 7px 10px; }
+.userStatusBadge.active { background: #eaf8f5; border-color: #b9e7dc; color: #15876d; }
+.userStatusBadge.suspended { background: #ffe8ed; border-color: #f3bac6; color: #b24d62; }
+.userListControls { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.userStatusFilters { background: #fffaf0; border: 1px solid #ead7b7; border-radius: 10px; display: inline-flex; padding: 3px; }
+.userStatusFilters button { background: transparent; border: 0; border-radius: 7px; color: #8b7355; font-size: 12px; font-weight: 800; padding: 7px 10px; }
+.userStatusFilters button.active { background: #fff3c4; color: #6f4525; }
+.userDetailRow { cursor: pointer; }
+.userDetailRow:hover { background: #fff8e8; }
+.pocketMembersDialog.userDetailDialog { max-height: 88vh; max-width: 640px; overflow: auto; width: min(640px, calc(100vw - 40px)); }
+.userDetailContent { display: grid; gap: 18px; padding: 22px; }
+.userDetailSummary { align-items: center; display: grid; gap: 12px; grid-template-columns: auto minmax(0, 1fr) auto; }
+.userDetailSummary small { color: #8b7355; display: block; margin-top: 4px; }
+.userReportSection, .userSuspensionSection { border-top: 1px solid #f0dfc2; display: grid; gap: 12px; padding-top: 18px; }
+.userDetailSectionTitle { align-items: center; display: flex; gap: 10px; justify-content: space-between; }
+.userDetailSectionTitle h3 { font-size: 16px; margin: 0; }
+.userReportList { display: grid; gap: 8px; }
+.userReportList > div { align-items: center; background: #fffaf0; border: 1px solid #f5e8cc; border-radius: 9px; display: flex; justify-content: space-between; padding: 11px 12px; }
+.userReportList span, .userDetailEmpty, .suspensionHelp { color: #8b7355; font-size: 12px; margin: 0; }
+.suspensionCurrent { color: #b24d62; font-size: 13px; font-weight: 800; margin: 0; }
+.suspensionPresets { display: flex; flex-wrap: wrap; gap: 8px; }
+.suspensionPresets button, .suspensionCustom button, .suspensionLift { background: #fff; border: 1px solid #dfc59b; border-radius: 9px; color: #6f4525; font-weight: 800; padding: 10px 14px; }
+.suspensionCustom button { background: #b24d62; border-color: #b24d62; color: #fff; }
+.suspensionPresets button.selected { background: #fff3c4; border-color: #dfae2a; box-shadow: 0 0 0 2px rgba(246, 200, 76, .18); color: #6f4525; }
+.suspensionPresets button.danger.selected { background: #b24d62; border-color: #8f3549; box-shadow: 0 0 0 3px rgba(178, 77, 98, .2); color: #fff; }
+.suspensionCustom { display: grid; gap: 7px; }
+.suspensionCustom label { color: #8b7355; font-size: 12px; font-weight: 800; }
+.suspensionCustom > div { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) auto; }
+.suspensionCustom input { border: 1px solid #dfc59b; border-radius: 9px; color: #5a371c; font: inherit; padding: 10px 12px; }
+.suspensionCustom input:focus { border-color: #dfae2a; box-shadow: 0 0 0 3px rgba(246, 200, 76, .2); outline: none; }
+.suspensionPresets button:disabled, .suspensionCustom button:disabled, .suspensionLift:disabled { opacity: .5; }
+.suspensionLift { justify-self: start; }
+.suspensionConfirmDialog { max-width: 400px; }
+.suspensionConfirmDialog .logoutConfirmActions button:last-child { background: #b24d62; border-color: #9f3f54; color: #fff; }
 .pocketMembersDialog.moderationDialog { max-height: 88vh; max-width: 760px; overflow: auto; scrollbar-color: #c9a875 #fffdf7; scrollbar-width: thin; width: min(760px, calc(100vw - 40px)); }
 .pocketMembersDialog.moderationDialog::-webkit-scrollbar { width: 12px; }
 .pocketMembersDialog.moderationDialog::-webkit-scrollbar-track { background: #fffdf7; border-left: 1px solid #f5e8cc; border-radius: 999px; }
@@ -524,9 +558,10 @@ button {
 .evidenceLink:hover { text-decoration: underline; }
 .emptyEvidenceValue { color: #9a8060; }
 .moderationActions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-.moderationActions button { background: #fff; border: 1px solid #ead7b7; border-radius: 9px; color: #7a4d28; font-weight: 800; padding: 10px 13px; }
+.moderationActions button { align-items: center; background: #fff; border: 1px solid #ead7b7; border-radius: 9px; color: #7a4d28; display: inline-flex; gap: 7px; justify-content: center; min-width: 92px; font-weight: 800; padding: 10px 13px; }
 .moderationActions button.danger { background: #b24d62; border-color: #b24d62; color: #fff; }
 .moderationActions button:disabled { opacity: .5; }
+.moderationError { color: #d32f4f; font-size: 14px; font-weight: 700; margin: 0; }
 .moderationResolved { background: #eaf8f5; border-radius: 10px; color: #15876d; padding: 14px; }
 
 @media (max-width: 640px) {

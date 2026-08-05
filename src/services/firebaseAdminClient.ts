@@ -15,6 +15,7 @@ import type {
   AdminPocket,
   AdminPocketMember,
   AdminUser,
+  AdminUserPage,
   AppUpdateConfig,
   AppUpdateRelease,
   DatabaseBackup,
@@ -87,11 +88,17 @@ export async function logoutAdmin() {
 
 export async function loadAdminUsers(
   environment: DatabaseEnvironment = 'production',
-): Promise<AdminUser[]> {
-  const result = await callAdminFunction<{ users: AdminUser[] }>('listAdminUsers', {
-    environment,
-  });
-  return result.users;
+  options: { page?: number; pageSize?: number; query?: string; status?: 'active' | 'all' | 'suspended' } = {},
+): Promise<AdminUserPage> {
+  return callAdminFunction<AdminUserPage>('listAdminUsers', { environment, ...options });
+}
+
+export async function setAdminUserSuspension(
+  userId: string,
+  options: { durationDays?: number; lift?: boolean; permanent?: boolean },
+  environment: DatabaseEnvironment = 'production',
+) {
+  await callAdminFunction('setAdminUserSuspension', { environment, userId, ...options });
 }
 
 export async function loadAdminPockets(

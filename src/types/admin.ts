@@ -7,6 +7,14 @@
   pocketCount: number;
   joinedAt: string;
   lastLoginAt: string;
+  status: 'active' | 'suspended';
+  suspendedUntil: string | null;
+  suspensionPermanent: boolean;
+};
+
+export type AdminUserPage = {
+  totalCount: number;
+  users: AdminUser[];
 };
 
 export type AdminPocket = {

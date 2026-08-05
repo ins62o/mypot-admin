@@ -20,7 +20,7 @@ import kakaoLogo from './assets/social/kakao-login.svg';
 import { AdminSearch } from './components/AdminSearch';
 import { AppNoticeManagement } from './components/AppNoticeManagement';
 import { StatCard } from './components/StatCard';
-import type { AdminDashboardMetrics, AdminPocket, AdminPocketMember, AdminUser, ContentReport, DatabaseBackup, DatabaseBackupStatus, ModerationAction, SupportInquiry, VersionNote, VersionReleaseType } from './types/admin';
+import type { AdminDashboardMetrics, AdminPocket, AdminPocketMember, AdminUser, AdminUserPage, ContentReport, DatabaseBackup, DatabaseBackupStatus, ModerationAction, SupportInquiry, VersionNote, VersionReleaseType } from './types/admin';
 import {
   answerSupportInquiry as answerSupportInquiryRemote,
   deleteAdminVersionNote,
@@ -36,6 +36,7 @@ import {
   loginAdminWithEmail,
   logoutAdmin,
   resolveAdminContentReport,
+  setAdminUserSuspension,
   saveAdminVersionNote,
   startAdminDatabaseRestore,
   subscribeToAdminSession,
@@ -44,6 +45,9 @@ import {
 import './styles.css';
 
 const PAGE_SIZE = 10;
+const REPORT_REASON_LABELS: Record<string, string> = {
+  abuse: '괴롭힘 또는 욕설', harassment: '괴롭힘 또는 욕설', hate: '혐오 표현', inappropriate: '부적절한 콘텐츠', other: '기타', sexual: '성적인 콘텐츠', spam: '스팸 또는 광고', violence: '폭력 또는 위협',
+};
 const DATABASE_ENVIRONMENT_STORAGE_KEY = 'mypot-admin-database-environment';
 const ADMIN_LOGIN_ALIAS = 'mypot';
 const ADMIN_LOGIN_EMAIL = 'mypot.support@gmail.com';
@@ -937,6 +941,8 @@ function App() {
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const [page, setPage] = useState<AdminPage>('dashboard');
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [userTotalCount, setUserTotalCount] = useState(0);
+  const [registeredUserCount, setRegisteredUserCount] = useState(0);
   const [pockets, setPockets] = useState<AdminPocket[]>([]);
   const [versionNotes, setVersionNotes] = useState<VersionNote[]>(() =>
     ensureVersionNoteDraft([]),
@@ -1014,7 +1020,9 @@ function App() {
       }
 
       if (loadedUsers.status === 'fulfilled') {
-        setUsers(loadedUsers.value);
+        setUsers(loadedUsers.value.users);
+        setUserTotalCount(loadedUsers.value.totalCount);
+        setRegisteredUserCount(loadedUsers.value.totalCount);
       }
       if (loadedPockets.status === 'fulfilled') {
         setPockets(loadedPockets.value);
@@ -1303,12 +1311,30 @@ function App() {
             environment={databaseEnvironment}
             firebaseStatusMessage={firebaseStatusMessage}
             onLoadPocketMembers={loadAdminPocketMembers}
+            onLoadUsers={async options => {
+              const result = await loadAdminUsers(databaseEnvironment, options);
+              setUsers(result.users);
+              setUserTotalCount(result.totalCount);
+              return result;
+            }}
             pendingDeletionPocketCount={pendingDeletionPocketCount}
             pockets={pockets}
             pocketWeeklyDelta={dashboardMetrics.pocketWeeklyDelta}
             reportCountByUserId={reportCountByUserId}
+            reports={contentReports}
+            onSetUserSuspension={async (userId, options) => {
+              await setAdminUserSuspension(userId, options, databaseEnvironment);
+              setUsers(current => current.map(user => user.id === userId ? {
+                ...user,
+                status: options.lift ? 'active' : 'suspended',
+                suspensionPermanent: options.permanent === true,
+                suspendedUntil: options.lift || options.permanent ? null : new Date(Date.now() + (options.durationDays ?? 0) * 86_400_000).toISOString(),
+              } : user));
+            }}
             userWeeklyDelta={dashboardMetrics.userWeeklyDelta}
             users={users}
+            userTotalCount={userTotalCount}
+            registeredUserCount={registeredUserCount}
           />
         ) : null}
 
@@ -1392,17 +1418,23 @@ type DashboardPageProps = {
     pocketId: string,
     environment: DatabaseEnvironment,
   ) => Promise<AdminPocketMember[]>;
+  onLoadUsers: (options: { page: number; pageSize: number; query: string; status: 'active' | 'all' | 'suspended' }) => Promise<AdminUserPage>;
   pendingDeletionPocketCount: number;
   pockets: AdminPocket[];
   pocketWeeklyDelta: number;
   reportCountByUserId: Record<string, number>;
+  reports: ContentReport[];
+  onSetUserSuspension: (userId: string, options: { durationDays?: number; lift?: boolean; permanent?: boolean }) => Promise<void>;
   userWeeklyDelta: number;
   users: AdminUser[];
+  userTotalCount: number;
+  registeredUserCount: number;
 };
 
 function ModerationPage({ reports, onResolve }: { reports: ContentReport[]; onResolve: (id: string, action: ModerationAction, note: string) => Promise<void> }) {
   const [selected, setSelected] = useState<ContentReport | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pendingAction, setPendingAction] = useState<ModerationAction | null>(null);
   const [error, setError] = useState('');
   const [reportPage, setReportPage] = useState(1);
   const reasonLabels: Record<string, string> = {
@@ -1425,10 +1457,10 @@ function ModerationPage({ reports, onResolve }: { reports: ContentReport[]; onRe
 
   async function act(action: ModerationAction) {
     if (!selected) return;
-    setBusy(true); setError('');
+    setBusy(true); setPendingAction(action); setError('');
     try { await onResolve(selected.id, action, ''); setSelected(null); }
     catch { setError('처리하지 못했어요. 신고 상태와 관리자 권한을 확인해 주세요.'); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setPendingAction(null); }
   }
   return <section className="moderationLayout">
     <article className="panel moderationList">
@@ -1451,7 +1483,7 @@ function ModerationPage({ reports, onResolve }: { reports: ContentReport[]; onRe
       <div className="moderationDetail"><dl><div><dt>신고자</dt><dd>{selected.reporterName}</dd></div><div><dt>신고 대상</dt><dd>{selected.targetName}</dd></div><div><dt>주머니</dt><dd>{selected.pocketName}</dd></div><div><dt>사유</dt><dd>{reasonLabels[selected.reason] ?? selected.reason}</dd></div></dl>
       {selected.details ? <div className="evidenceBox"><strong>추가 설명</strong><p>{selected.details}</p></div> : null}
       <div className="evidenceBox"><strong>신고 당시 콘텐츠</strong><EvidenceSummary createdAt={selected.createdAt} evidence={selected.evidence} /></div>
-      {selected.status === 'open' ? <>{error ? <p className="loginError">{error}</p> : null}<div className="moderationActions"><button disabled={busy} onClick={() => act('dismiss')} type="button">문제 없음</button><button className="danger" disabled={busy} onClick={() => act('confirm_violation')} type="button">위반 처리</button></div></> : <p className="moderationResolved">이미 처리된 신고입니다.</p>}
+      {selected.status === 'open' ? <>{error ? <p className="moderationError">{error}</p> : null}<div className="moderationActions"><button aria-busy={pendingAction === 'dismiss'} disabled={busy} onClick={() => act('dismiss')} type="button">{pendingAction === 'dismiss' ? <><LoaderCircle aria-hidden="true" className="buttonSpinner" size={16} /><span className="srOnly">문제 없음 처리 중</span></> : '문제 없음'}</button><button aria-busy={pendingAction === 'confirm_violation'} className="danger" disabled={busy} onClick={() => act('confirm_violation')} type="button">{pendingAction === 'confirm_violation' ? <><LoaderCircle aria-hidden="true" className="buttonSpinner" size={16} /><span className="srOnly">위반 처리 중</span></> : '위반 처리'}</button></div></> : <p className="moderationResolved">이미 처리된 신고입니다.</p>}
       </div>
     </section></div> : null}
   </section>;
@@ -1463,39 +1495,34 @@ function DashboardPage({
   environment,
   firebaseStatusMessage,
   onLoadPocketMembers,
+  onLoadUsers,
   pendingDeletionPocketCount,
   pockets,
   pocketWeeklyDelta,
   reportCountByUserId,
+  reports,
+  onSetUserSuspension,
   userWeeklyDelta,
   users,
+  userTotalCount,
+  registeredUserCount,
 }: DashboardPageProps) {
   const [userQuery, setUserQuery] = useState('');
+  const [userStatusFilter, setUserStatusFilter] = useState<'active' | 'all' | 'suspended'>('all');
   const [userPage, setUserPage] = useState(1);
   const [pocketPage, setPocketPage] = useState(1);
   const [pocketSortKey, setPocketSortKey] =
     useState<PocketSortKey>('memberCount');
   const [selectedPocket, setSelectedPocket] = useState<AdminPocket | null>(null);
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [suspensionDays, setSuspensionDays] = useState('');
+  const [suspensionPreset, setSuspensionPreset] = useState<3 | 7 | 30 | 'permanent' | null>(null);
+  const [suspensionBusy, setSuspensionBusy] = useState(false);
+  const [suspensionError, setSuspensionError] = useState('');
+  const [pendingSuspension, setPendingSuspension] = useState<{ durationDays?: number; permanent?: boolean } | null>(null);
   const [pocketMembers, setPocketMembers] = useState<AdminPocketMember[]>([]);
   const [isLoadingPocketMembers, setIsLoadingPocketMembers] = useState(false);
   const [pocketMembersError, setPocketMembersError] = useState('');
-
-  const filteredUsers = useMemo(() => {
-    const normalizedQuery = userQuery.trim().toLowerCase();
-
-    return users
-      .filter((user) => {
-        if (!normalizedQuery) {
-          return true;
-        }
-
-        return [user.displayName, user.email, user.id]
-          .join(' ')
-          .toLowerCase()
-          .includes(normalizedQuery);
-      })
-      .sort((left, right) => right.joinedAt.localeCompare(left.joinedAt));
-  }, [userQuery, users]);
 
   const sortedPockets = useMemo(() => {
     return [...pockets].sort((left, right) => {
@@ -1507,15 +1534,46 @@ function DashboardPage({
     });
   }, [pocketSortKey, pockets]);
 
-  const userPageCount = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const userPageCount = Math.max(1, Math.ceil(userTotalCount / PAGE_SIZE));
   const pocketPageCount = Math.max(1, Math.ceil(sortedPockets.length / PAGE_SIZE));
-  const visibleUsers = paginate(filteredUsers, userPage);
+  const visibleUsers = users;
   const visiblePockets = paginate(sortedPockets, pocketPage);
+  const selectedUserReports = selectedUser
+    ? reports.filter(report => report.status === 'resolved' && [report.targetUid, report.targetId, report.evidence.authorUid].includes(selectedUser.id))
+    : [];
+
+  async function updateSuspension(options: { durationDays?: number; lift?: boolean; permanent?: boolean }) {
+    if (!selectedUser) return;
+    setSuspensionBusy(true);
+    setSuspensionError('');
+    try {
+      await onSetUserSuspension(selectedUser.id, options);
+      setSelectedUser(current => current ? {
+        ...current,
+        status: options.lift ? 'active' : 'suspended',
+        suspensionPermanent: options.permanent === true,
+        suspendedUntil: options.lift || options.permanent ? null : new Date(Date.now() + (options.durationDays ?? 0) * 86_400_000).toISOString(),
+      } : null);
+      setSuspensionDays('');
+      setSuspensionPreset(null);
+    } catch {
+      setSuspensionError('사용자 정지 상태를 변경하지 못했어요.');
+    } finally {
+      setSuspensionBusy(false);
+    }
+  }
 
   function updateUserQuery(value: string) {
     setUserQuery(value);
     setUserPage(1);
   }
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      void onLoadUsers({ page: userPage, pageSize: PAGE_SIZE, query: userQuery.trim(), status: userStatusFilter });
+    }, 250);
+    return () => window.clearTimeout(timeout);
+  }, [userPage, userQuery, userStatusFilter]);
 
   function updatePocketSort(nextSortKey: PocketSortKey) {
     setPocketSortKey(nextSortKey);
@@ -1543,7 +1601,7 @@ function DashboardPage({
         <StatCard
           icon={<Users size={20} aria-hidden="true" />}
           label="전체 사용자"
-          value={`${users.length.toLocaleString()}명`}
+          value={`${registeredUserCount.toLocaleString()}명`}
           caption="가입된 전체 사용자 합계"
           trend={formatWeeklyTrend(userWeeklyDelta)}
         />
@@ -1563,28 +1621,30 @@ function DashboardPage({
               <p className="eyebrow">사용자</p>
               <h2>전체 사용자 목록</h2>
             </div>
-            <AdminSearch
-              value={userQuery}
-              onChange={updateUserQuery}
-              placeholder="이름 검색"
-            />
+            <div className="userListControls">
+              <AdminSearch value={userQuery} onChange={updateUserQuery} placeholder="이름 또는 이메일 검색" />
+              <div className="userStatusFilters" aria-label="사용자 상태 필터">
+                {([['all', '전체'], ['active', '활성'], ['suspended', '정지']] as const).map(([value, label]) => <button className={userStatusFilter === value ? 'active' : ''} key={value} onClick={() => { setUserStatusFilter(value); setUserPage(1); }} type="button">{label}</button>)}
+              </div>
+            </div>
           </div>
 
           <div className="tableWrap compactTable dashboardTableWrap">
             <table>
               <thead>
                 <tr>
+                  <th>상태</th>
                   <th>사용자</th>
                   <th>로그인</th>
                   <th>참여</th>
-                  <th>처리 신고</th>
                   <th>가입일</th>
                   <th>최근 로그인</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleUsers.map((user) => (
-                  <tr key={user.id}>
+                  <tr className="userDetailRow" key={user.id} onClick={() => { setSelectedUser(user); setSuspensionError(''); setSuspensionDays(''); setSuspensionPreset(null); }}>
+                    <td><UserStatusBadge status={user.status} /></td>
                     <td>
                       <div className="userCell">
                         <UserAvatar
@@ -1600,7 +1660,6 @@ function DashboardPage({
                       <ProviderBadge provider={user.provider} />
                     </td>
                     <td>{user.pocketCount}개</td>
-                    <td><ReportCountBadge count={reportCountByUserId[user.id] ?? 0} /></td>
                     <td>{user.joinedAt}</td>
                     <td>{user.lastLoginAt}</td>
                   </tr>
@@ -1619,7 +1678,7 @@ function DashboardPage({
             currentPage={userPage}
             onChange={setUserPage}
             pageCount={userPageCount}
-            totalCount={filteredUsers.length}
+            totalCount={userTotalCount}
           />
         </article>
 
@@ -1703,6 +1762,40 @@ function DashboardPage({
           />
         </article>
       </section>
+
+      {selectedUser ? (
+        <div className="pocketMembersBackdrop" role="presentation">
+          <section aria-labelledby="user-detail-title" aria-modal="true" className="pocketMembersDialog userDetailDialog" role="dialog">
+            <div className="panelHeader compact">
+              <div><p className="eyebrow">사용자 상세</p><h2 id="user-detail-title">{selectedUser.displayName}</h2></div>
+              <button className="pocketMembersClose" onClick={() => setSelectedUser(null)} type="button">닫기</button>
+            </div>
+            <div className="userDetailContent">
+              <div className="userDetailSummary">
+                <UserAvatar displayName={selectedUser.displayName} photoURL={selectedUser.photoURL} />
+                <div><strong>{selectedUser.displayName}</strong></div>
+                <UserStatusBadge status={selectedUser.status} />
+              </div>
+              <section className="userReportSection">
+                <div className="userDetailSectionTitle"><h3>처리 신고</h3><ReportCountBadge count={selectedUserReports.length} /></div>
+                {selectedUserReports.length ? <div className="userReportList">{selectedUserReports.map(report => (
+                  <div key={report.id}><strong>{report.targetType === 'feed' ? '피드' : report.targetType === 'chatMessage' ? '채팅' : '사용자'} · {REPORT_REASON_LABELS[report.reason] ?? report.reason}</strong><span>{report.resolvedAt ? new Date(report.resolvedAt).toLocaleString('ko-KR') : '-'}</span></div>
+                ))}</div> : <p className="userDetailEmpty">처리 완료된 신고가 없습니다.</p>}
+              </section>
+              <section className="userSuspensionSection">
+                <div className="userDetailSectionTitle"><h3>계정 정지</h3></div>
+                {selectedUser.status === 'suspended' ? <p className="suspensionCurrent">{selectedUser.suspensionPermanent ? '영구 정지 중' : `${selectedUser.suspendedUntil ? new Date(selectedUser.suspendedUntil).toLocaleString('ko-KR') : '-'}까지 정지`}</p> : <p className="suspensionHelp">기간을 선택하거나 직접 일수를 입력해 주세요.</p>}
+                <div className="suspensionPresets">{([3, 7, 30] as const).map(days => <button className={suspensionPreset === days ? 'selected' : ''} disabled={suspensionBusy} key={days} onClick={() => { setSuspensionPreset(days); setSuspensionDays(''); }} type="button">{days}일</button>)}<button className={`danger ${suspensionPreset === 'permanent' ? 'selected' : ''}`} disabled={suspensionBusy} onClick={() => { setSuspensionPreset('permanent'); setSuspensionDays(''); }} type="button">영구</button></div>
+                <div className="suspensionCustom"><label htmlFor="suspension-days">직접 입력</label><div><input id="suspension-days" inputMode="numeric" min="1" max="3650" onChange={event => { setSuspensionDays(event.target.value.replace(/\D/g, '')); setSuspensionPreset(null); }} placeholder="일수" type="text" value={suspensionDays} /><button disabled={suspensionBusy || (!suspensionPreset && (!suspensionDays || Number(suspensionDays) < 1 || Number(suspensionDays) > 3650))} onClick={() => setPendingSuspension(suspensionPreset === 'permanent' ? { permanent: true } : { durationDays: typeof suspensionPreset === 'number' ? suspensionPreset : Number(suspensionDays) })} type="button">정지 적용</button></div></div>
+                {suspensionError ? <p className="moderationError">{suspensionError}</p> : null}
+                {selectedUser.status === 'suspended' ? <button className="suspensionLift" disabled={suspensionBusy} onClick={() => updateSuspension({ lift: true })} type="button">정지 해제</button> : null}
+              </section>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {selectedUser && pendingSuspension ? <div className="logoutConfirmBackdrop" role="presentation"><section aria-labelledby="suspension-confirm-title" aria-modal="true" className="logoutConfirmDialog suspensionConfirmDialog" role="dialog"><h2 id="suspension-confirm-title">계정을 정지할까요?</h2><p><strong>{selectedUser.displayName}</strong> 사용자를 {pendingSuspension.permanent ? '영구 정지' : `${pendingSuspension.durationDays}일 동안 정지`}합니다.</p><div className="logoutConfirmActions"><button onClick={() => setPendingSuspension(null)} type="button">취소</button><button className="dangerConfirm" disabled={suspensionBusy} onClick={() => { const options = pendingSuspension; setPendingSuspension(null); void updateSuspension(options); }} type="button">정지 적용</button></div></section></div> : null}
 
       {selectedPocket ? (
         <div className="pocketMembersBackdrop" role="presentation">
@@ -2915,6 +3008,10 @@ function UserAvatar({ displayName, photoURL }: UserAvatarProps) {
 
 function ReportCountBadge({ count }: { count: number }) {
   return <span className={`reportCountBadge ${count > 0 ? 'hasReports' : ''}`}>{count.toLocaleString('ko-KR')}건</span>;
+}
+
+function UserStatusBadge({ status }: { status: AdminUser['status'] }) {
+  return <span className={`userStatusBadge ${status}`}>{status === 'suspended' ? '정지' : '활성'}</span>;
 }
 
 function ProviderBadge({ provider }: { provider: 'Kakao' | 'Apple' }) {
