@@ -1000,7 +1000,12 @@ function App() {
     setDataSourceStatus('loading');
     setFirebaseStatusMessage(`${environmentLabel} Firebase 데이터 불러오는 중`);
     Promise.allSettled([
-      loadAdminUsers(databaseEnvironment),
+      loadAdminUsers(databaseEnvironment, {
+        page: 1,
+        pageSize: PAGE_SIZE,
+        query: '',
+        status: 'all',
+      }),
       loadAdminPockets(databaseEnvironment),
       loadAdminVersionNotes(databaseEnvironment),
       loadAdminSupportInquiries(databaseEnvironment),
@@ -2902,6 +2907,25 @@ type UserAvatarProps = {
   photoURL: string | null;
 };
 
+function getAvatarInitial(displayName: string) {
+  return displayName.trim().slice(0, 1) || '?';
+}
+
+function getUsablePhotoURL(photoURL: string | null) {
+  if (typeof photoURL !== 'string') {
+    return null;
+  }
+
+  const trimmedPhotoURL = photoURL.trim();
+  if (!trimmedPhotoURL || /^(null|undefined)$/i.test(trimmedPhotoURL)) {
+    return null;
+  }
+
+  return /^(https?:\/\/|data:image\/|blob:)/i.test(trimmedPhotoURL)
+    ? trimmedPhotoURL
+    : null;
+}
+
 function formatWeeklyTrend(delta: number) {
   if (delta > 0) {
     return `지난주 대비 +${delta}`;
@@ -3048,11 +3072,22 @@ function buildReportCountByUserId(reports: ContentReport[]) {
 }
 
 function UserAvatar({ displayName, photoURL }: UserAvatarProps) {
-  if (photoURL) {
-    return <img className="userAvatar" src={photoURL} alt={displayName} />;
+  const [failedPhotoURL, setFailedPhotoURL] = useState<string | null>(null);
+  const usablePhotoURL = getUsablePhotoURL(photoURL);
+
+  if (usablePhotoURL && failedPhotoURL !== usablePhotoURL) {
+    return (
+      <img
+        className="userAvatar"
+        src={usablePhotoURL}
+        alt={displayName}
+        referrerPolicy="no-referrer"
+        onError={() => setFailedPhotoURL(usablePhotoURL)}
+      />
+    );
   }
 
-  return <span className="userAvatarFallback">{displayName.slice(0, 1)}</span>;
+  return <span className="userAvatarFallback">{getAvatarInitial(displayName)}</span>;
 }
 
 function ReportCountBadge({ count }: { count: number }) {

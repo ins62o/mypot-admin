@@ -1237,7 +1237,7 @@ th {
 
 .dashboardSplit {
   align-items: stretch;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .tallPanel {
