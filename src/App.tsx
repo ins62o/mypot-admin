@@ -53,7 +53,6 @@ const ADMIN_LOGIN_ALIAS = 'mypot';
 const ADMIN_LOGIN_EMAIL = 'mypot.support@gmail.com';
 
 type AdminPage = 'dashboard' | 'database' | 'moderation' | 'updates' | 'versions' | 'support';
-type PocketSortKey = 'memberCount' | 'recordCount' | 'level' | 'status';
 type DataSourceStatus = 'firebase' | 'loading' | 'error';
 type EvidenceContentItem = { key: string; value: ReactNode };
 type EvidenceRow = { key: string; label: string; value: ReactNode };
@@ -66,13 +65,6 @@ const statusLabel = {
   published: '작성 완료',
   waiting: '답변 대기',
 } as const;
-
-const pocketSortLabels: Record<PocketSortKey, string> = {
-  memberCount: '구성원',
-  level: '레벨',
-  recordCount: '기록',
-  status: '상태',
-};
 
 const pageTitle: Record<AdminPage, string> = {
   database: 'DB 현황',
@@ -1041,7 +1033,7 @@ function App() {
         setSelectedVersionId(fallbackNotes[0].id);
       }
       if (loadedInquiries.status === 'fulfilled') {
-        setSupportInquiries(filterOpenSupportInquiries(loadedInquiries.value));
+        setSupportInquiries(loadedInquiries.value);
       } else {
         setSupportInquiries([]);
       }
@@ -1092,7 +1084,7 @@ function App() {
     loadAdminSupportInquiries(databaseEnvironment)
       .then((inquiries) => {
         if (isMounted) {
-          setSupportInquiries(filterOpenSupportInquiries(inquiries));
+          setSupportInquiries(inquiries);
         }
       })
       .catch(() => {
@@ -1369,9 +1361,8 @@ function App() {
             inquiries={supportInquiries}
             onAnswerInquiry={async (inquiry, answer) => {
               await answerSupportInquiryRemote(inquiry, answer, databaseEnvironment);
-              setSupportInquiries((currentInquiries) =>
-                currentInquiries.filter((item) => item.id !== inquiry.id),
-              );
+              const refreshedInquiries = await loadAdminSupportInquiries(databaseEnvironment);
+              setSupportInquiries(refreshedInquiries);
             }}
             waitingCount={waitingInquiryCount}
           />
@@ -1510,9 +1501,10 @@ function DashboardPage({
   const [userQuery, setUserQuery] = useState('');
   const [userStatusFilter, setUserStatusFilter] = useState<'active' | 'all' | 'suspended'>('all');
   const [userPage, setUserPage] = useState(1);
+  const [pocketQuery, setPocketQuery] = useState('');
+  const [pocketStatusFilter, setPocketStatusFilter] =
+    useState<'active' | 'all' | 'pendingDeletion'>('all');
   const [pocketPage, setPocketPage] = useState(1);
-  const [pocketSortKey, setPocketSortKey] =
-    useState<PocketSortKey>('memberCount');
   const [selectedPocket, setSelectedPocket] = useState<AdminPocket | null>(null);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [suspensionDays, setSuspensionDays] = useState('');
@@ -1525,14 +1517,20 @@ function DashboardPage({
   const [pocketMembersError, setPocketMembersError] = useState('');
 
   const sortedPockets = useMemo(() => {
-    return [...pockets].sort((left, right) => {
-      if (pocketSortKey === 'status') {
-        return left.status.localeCompare(right.status);
-      }
-
-      return right[pocketSortKey] - left[pocketSortKey];
+    const normalizedQuery = pocketQuery.trim().toLocaleLowerCase('ko-KR');
+    const filteredPockets = pockets.filter((pocketItem) => {
+      const matchesQuery =
+        !normalizedQuery ||
+        pocketItem.name.toLocaleLowerCase('ko-KR').includes(normalizedQuery);
+      const matchesStatus =
+        pocketStatusFilter === 'all' || pocketItem.status === pocketStatusFilter;
+      return matchesQuery && matchesStatus;
     });
-  }, [pocketSortKey, pockets]);
+
+    return [...filteredPockets].sort(
+      (left, right) => right.memberCount - left.memberCount,
+    );
+  }, [pocketQuery, pocketStatusFilter, pockets]);
 
   const userPageCount = Math.max(1, Math.ceil(userTotalCount / PAGE_SIZE));
   const pocketPageCount = Math.max(1, Math.ceil(sortedPockets.length / PAGE_SIZE));
@@ -1575,8 +1573,8 @@ function DashboardPage({
     return () => window.clearTimeout(timeout);
   }, [userPage, userQuery, userStatusFilter]);
 
-  function updatePocketSort(nextSortKey: PocketSortKey) {
-    setPocketSortKey(nextSortKey);
+  function updatePocketQuery(value: string) {
+    setPocketQuery(value);
     setPocketPage(1);
   }
 
@@ -1608,8 +1606,8 @@ function DashboardPage({
         <StatCard
           icon={<Layers3 size={20} aria-hidden="true" />}
           label="전체 주머니"
-          value={`${pockets.length.toLocaleString()}개`}
-          caption={`운영중 ${activePocketCount}개 · 삭제 대기 ${pendingDeletionPocketCount}개`}
+          value={`${activePocketCount.toLocaleString()}개`}
+          caption={`운영 중인 주머니 · 삭제 대기 ${pendingDeletionPocketCount}개 제외`}
           trend={formatWeeklyTrend(pocketWeeklyDelta)}
         />
       </section>
@@ -1688,19 +1686,31 @@ function DashboardPage({
               <p className="eyebrow">주머니</p>
               <h2>주머니 현황</h2>
             </div>
-            <div className="filterGroup" aria-label="주머니 정렬">
-              {(Object.keys(pocketSortLabels) as PocketSortKey[]).map(
-                (sortKey) => (
-                  <button
-                    className={pocketSortKey === sortKey ? 'active' : ''}
-                    key={sortKey}
-                    type="button"
-                    onClick={() => updatePocketSort(sortKey)}
-                  >
-                    {pocketSortLabels[sortKey]}
-                  </button>
-                ),
-              )}
+            <div className="pocketListControls">
+              <div className="userListControls">
+                <AdminSearch
+                  value={pocketQuery}
+                  onChange={updatePocketQuery}
+                  placeholder="주머니 이름 검색"
+                />
+                <div className="userStatusFilters" aria-label="주머니 상태 필터">
+                  {([['all', '전체'], ['active', '운영'], ['pendingDeletion', '삭제 대기']] as const).map(
+                    ([value, label]) => (
+                      <button
+                        className={pocketStatusFilter === value ? 'active' : ''}
+                        key={value}
+                        onClick={() => {
+                          setPocketStatusFilter(value);
+                          setPocketPage(1);
+                        }}
+                        type="button"
+                      >
+                        {label}
+                      </button>
+                    ),
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -2644,16 +2654,30 @@ function SupportPage({
   onAnswerInquiry,
   waitingCount,
 }: SupportPageProps) {
+  const [inquiryFilter, setInquiryFilter] = useState<'waiting' | 'answered'>('waiting');
+  const answeredCount = inquiries.filter((inquiry) => inquiry.status === 'answered').length;
+  const filteredInquiries = inquiries.filter(
+    (inquiry) => inquiry.status === inquiryFilter,
+  );
   const defaultInquiryId =
-    inquiries.find((inquiry) => inquiry.status === 'waiting')?.id ??
-    inquiries[0]?.id ??
+    filteredInquiries[0]?.id ??
     '';
   const [selectedInquiryId, setSelectedInquiryId] = useState(defaultInquiryId);
   const selectedInquiry =
-    inquiries.find((inquiry) => inquiry.id === selectedInquiryId) ?? inquiries[0];
+    filteredInquiries.find((inquiry) => inquiry.id === selectedInquiryId) ??
+    filteredInquiries[0];
   const [answerText, setAnswerText] = useState(selectedInquiry?.answer ?? '');
   const [isAnswerConfirmOpen, setIsAnswerConfirmOpen] = useState(false);
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
+
+  useEffect(() => {
+    const selectedIsVisible = filteredInquiries.some(
+      (inquiry) => inquiry.id === selectedInquiryId,
+    );
+    if (!selectedIsVisible) {
+      setSelectedInquiryId(filteredInquiries[0]?.id ?? '');
+    }
+  }, [filteredInquiries, selectedInquiryId]);
 
   useEffect(() => {
     setAnswerText(selectedInquiry?.answer ?? '');
@@ -2688,14 +2712,35 @@ function SupportPage({
       <aside className="panel supportQueuePanel">
         <div className="panelHeader compact">
           <div>
-            <p className="eyebrow">Queue</p>
-            <h2>답변 대기</h2>
+            <p className="eyebrow">1:1 문의</p>
+            <h2>문의 내역</h2>
           </div>
-          <strong className="supportQueueCount">{waitingCount}건</strong>
+          <strong className="supportQueueCount">{inquiries.length}건</strong>
+        </div>
+
+        <div className="supportStatusTabs" role="tablist" aria-label="문의 상태">
+          <button
+            aria-selected={inquiryFilter === 'waiting'}
+            className={inquiryFilter === 'waiting' ? 'active' : ''}
+            onClick={() => setInquiryFilter('waiting')}
+            role="tab"
+            type="button"
+          >
+            답변 대기 <span>{waitingCount}</span>
+          </button>
+          <button
+            aria-selected={inquiryFilter === 'answered'}
+            className={inquiryFilter === 'answered' ? 'active' : ''}
+            onClick={() => setInquiryFilter('answered')}
+            role="tab"
+            type="button"
+          >
+            처리 완료 <span>{answeredCount}</span>
+          </button>
         </div>
 
         <div className="supportTicketList">
-          {inquiries.map((inquiry) => (
+          {filteredInquiries.map((inquiry) => (
             <button
               className={
                 inquiry.id === selectedInquiry?.id
@@ -2716,8 +2761,12 @@ function SupportPage({
               </small>
             </button>
           ))}
-          {inquiries.length === 0 ? (
-            <div className="emptyTicketState">모든 문의를 처리했어요.</div>
+          {filteredInquiries.length === 0 ? (
+            <div className="emptyTicketState">
+              {inquiryFilter === 'waiting'
+                ? '답변을 기다리는 문의가 없어요.'
+                : '처리 완료된 문의가 없어요.'}
+            </div>
           ) : null}
         </div>
       </aside>
@@ -2805,7 +2854,11 @@ function SupportPage({
           </div>
         </article>
       ) : (
-        <article className="panel emptyState">모든 문의를 처리했어요.</article>
+        <article className="panel emptyState">
+          {inquiryFilter === 'waiting'
+            ? '답변을 기다리는 문의가 없어요.'
+            : '처리 완료된 문의가 없어요.'}
+        </article>
       )}
       {isAnswerConfirmOpen && selectedInquiry ? (
         <div className="supportAnswerBackdrop" role="presentation">
@@ -2969,10 +3022,6 @@ function detectReleaseType(
 function paginate<T>(items: T[], page: number) {
   const startIndex = (page - 1) * PAGE_SIZE;
   return items.slice(startIndex, startIndex + PAGE_SIZE);
-}
-
-function filterOpenSupportInquiries(inquiries: SupportInquiry[]) {
-  return inquiries.filter((inquiry) => inquiry.status !== 'answered');
 }
 
 function buildReportCountByUserId(reports: ContentReport[]) {

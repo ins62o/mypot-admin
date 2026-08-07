@@ -1237,7 +1237,7 @@ th {
 
 .dashboardSplit {
   align-items: stretch;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .tallPanel {
@@ -1260,30 +1260,11 @@ th {
   gap: 14px;
 }
 
-.filterGroup {
-  align-items: center;
+.pocketListControls {
+  align-items: flex-end;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  justify-content: flex-end;
-}
-
-.filterGroup button {
-  background: #fffdf7;
-  border: 1px solid #ead7b7;
-  border-radius: 999px;
-  color: #7a4d28;
-  font-size: 12px;
-  font-weight: 800;
-  height: 30px;
-  padding: 0 10px;
-}
-
-.filterGroup button.active,
-.filterGroup button:hover {
-  background: #fff3c4;
-  border-color: rgba(246, 200, 76, 0.78);
-  color: #5a371c;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .providerLogoBadge {
@@ -1763,6 +1744,49 @@ tbody tr {
   display: grid;
   gap: 8px;
   padding: 10px;
+}
+
+.supportStatusTabs {
+  border-bottom: 1px solid #f5e8cc;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 10px;
+}
+
+.supportQueuePanel > .panelHeader {
+  border-bottom: 0;
+}
+
+.supportStatusTabs button {
+  align-items: center;
+  background: #fffdf7;
+  border: 1px solid #ead7b7;
+  border-radius: 10px;
+  color: #8b7355;
+  display: flex;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 6px;
+  justify-content: center;
+  min-height: 38px;
+}
+
+.supportStatusTabs button.active {
+  background: #fff3c4;
+  border-color: #dfae2a;
+  color: #5a371c;
+}
+
+.supportStatusTabs span {
+  align-items: center;
+  background: #ffffff;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 11px;
+  justify-content: center;
+  min-width: 22px;
+  padding: 2px 6px;
 }
 
 .supportTicketItem {
@@ -4510,4 +4534,212 @@ tbody tr {
   background: #f6c84c;
   border: 1px solid #dfae2a;
   color: #5a371c;
+}
+
+/* Mobile admin layout */
+@media (max-width: 768px) {
+  body {
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .appShell {
+    min-width: 0;
+  }
+
+  .sidebar {
+    gap: 12px;
+    padding: 14px 14px 10px;
+    position: static;
+    width: 100%;
+  }
+
+  .brandBlock {
+    padding: 0 2px;
+  }
+
+  .brandMark {
+    height: 38px;
+    width: 38px;
+  }
+
+  .navList {
+    display: flex;
+    gap: 8px;
+    margin: 0 -14px;
+    overflow-x: auto;
+    padding: 0 14px 6px;
+    scrollbar-width: none;
+  }
+
+  .navList::-webkit-scrollbar {
+    display: none;
+  }
+
+  .navGroup {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 4px;
+    padding: 5px;
+  }
+
+  .navGroupLabel {
+    display: none;
+  }
+
+  .navList button {
+    flex: 0 0 auto;
+    gap: 6px;
+    min-height: 40px;
+    padding: 5px 9px;
+    white-space: nowrap;
+    width: auto;
+  }
+
+  .navIcon {
+    height: 28px;
+    width: 28px;
+  }
+
+  .navCount {
+    margin-left: 0;
+  }
+
+  .mainArea {
+    min-width: 0;
+    padding: 16px 14px 28px;
+  }
+
+  .topBar {
+    margin-bottom: 16px;
+  }
+
+  .topBar h1 {
+    font-size: 23px;
+    line-height: 30px;
+  }
+
+  .logoutButton {
+    min-height: 38px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .dashboardStats,
+  .statsGrid,
+  .dashboardSplit,
+  .contentGrid,
+  .bottomGrid,
+  .supportDeskLayout,
+  .databaseTwoColumn {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .statCard {
+    min-height: 92px;
+    padding: 15px;
+  }
+
+  .panelHeader,
+  .pocketPanelHeader {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    padding: 15px 14px 12px;
+  }
+
+  .userListControls,
+  .searchBox {
+    width: 100%;
+  }
+
+  .pocketListControls {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .tableWrap {
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .compactTable table,
+  .dashboardSections table {
+    min-width: 680px;
+  }
+
+  .pagination {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .pagination div {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .pagination button {
+    min-width: 76px;
+  }
+
+  .supportQueuePanel,
+  .supportDetailPanel {
+    min-height: 0;
+  }
+
+  .supportTicketList {
+    max-height: 390px;
+    overflow-y: auto;
+  }
+
+  .supportDetailHeader {
+    gap: 10px;
+  }
+
+  .supportDetailHeader h2 {
+    font-size: 19px;
+    line-height: 27px;
+  }
+
+  .supportDetailBody {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .customerMessageCard,
+  .attachmentSection,
+  .answerComposer {
+    padding: 14px;
+  }
+
+  .answerActionRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .answerActionRow button {
+    min-height: 44px;
+    width: 100%;
+  }
+
+  .attachmentDownloadList a {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .attachmentDownloadList em {
+    grid-column: 2;
+  }
+
+  .pocketMembersBackdrop,
+  .supportAnswerBackdrop,
+  .logoutConfirmBackdrop {
+    padding: 14px;
+  }
+
+  .pocketMembersDialog,
+  .pocketMembersDialog.userDetailDialog,
+  .pocketMembersDialog.moderationDialog {
+    max-height: calc(100dvh - 28px);
+    width: 100%;
+  }
 }

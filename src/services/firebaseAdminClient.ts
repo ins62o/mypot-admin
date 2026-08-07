@@ -281,7 +281,12 @@ export async function loadAdminSupportInquiries(
 ): Promise<SupportInquiry[]> {
   const result = await callAdminFunction<{ inquiries?: RawSupportInquiry[] }>(
     'listAdminSupportInquiries',
-    { environment },
+    {
+      environment,
+      includeAnswered: true,
+      includeResolved: true,
+      status: 'all',
+    },
   );
   return (result.inquiries ?? []).map(normalizeSupportInquiry);
 }
