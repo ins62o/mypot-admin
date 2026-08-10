@@ -46,9 +46,13 @@ export function AppUpdateWebView() {
       platformConfig &&
       compareVersions(currentVersion, platformConfig.latestVersion) >= 0,
   );
-  const effectiveConfig = config && platformConfig && currentVersion &&
-    compareVersions(currentVersion, platformConfig.minimumVersion) < 0
-    ? { ...config, mode: 'required' as const }
+  const effectiveConfig = config && platformConfig && currentVersion
+    ? {
+        ...config,
+        mode: compareVersions(currentVersion, platformConfig.minimumVersion) < 0
+          ? 'required' as const
+          : 'optional' as const,
+      }
     : config;
 
   useEffect(() => {

@@ -962,6 +962,8 @@ function App() {
     });
   const [dashboardMetrics, setDashboardMetrics] =
     useState<AdminDashboardMetrics>({ pocketWeeklyDelta: 0, userWeeklyDelta: 0 });
+  const [loadedDashboardEnvironment, setLoadedDashboardEnvironment] =
+    useState<DatabaseEnvironment | null>(null);
   const [selectedVersionId, setSelectedVersionId] = useState('version_1.0.0');
 
   const activePocketCount = pockets.filter(
@@ -986,6 +988,9 @@ function App() {
   useEffect(() => {
     return subscribeToAdminSession((user) => {
       setIsAuthenticated(Boolean(user));
+      if (!user) {
+        setLoadedDashboardEnvironment(null);
+      }
       setIsCheckingSession(false);
     });
   }, []);
@@ -999,14 +1004,41 @@ function App() {
     const environmentLabel = databaseEnvironment === 'production' ? '운영' : '개발';
     setDataSourceStatus('loading');
     setFirebaseStatusMessage(`${environmentLabel} Firebase 데이터 불러오는 중`);
+    const usersRequest = loadAdminUsers(databaseEnvironment, {
+      page: 1,
+      pageSize: PAGE_SIZE,
+      query: '',
+      status: 'all',
+    });
+    const pocketsRequest = loadAdminPockets(databaseEnvironment);
+
+    Promise.allSettled([usersRequest, pocketsRequest]).then(
+      ([loadedUsers, loadedPockets]) => {
+        if (!isMounted) {
+          return;
+        }
+
+        if (loadedUsers.status === 'fulfilled') {
+          setUsers(loadedUsers.value.users);
+          setUserTotalCount(loadedUsers.value.totalCount);
+          setRegisteredUserCount(loadedUsers.value.totalCount);
+        } else {
+          setUsers([]);
+        }
+
+        if (loadedPockets.status === 'fulfilled') {
+          setPockets(loadedPockets.value);
+        } else {
+          setPockets([]);
+        }
+
+        setLoadedDashboardEnvironment(databaseEnvironment);
+      },
+    );
+
     Promise.allSettled([
-      loadAdminUsers(databaseEnvironment, {
-        page: 1,
-        pageSize: PAGE_SIZE,
-        query: '',
-        status: 'all',
-      }),
-      loadAdminPockets(databaseEnvironment),
+      usersRequest,
+      pocketsRequest,
       loadAdminVersionNotes(databaseEnvironment),
       loadAdminSupportInquiries(databaseEnvironment),
       loadAdminDashboardMetrics(databaseEnvironment),
@@ -1157,10 +1189,16 @@ function App() {
     }
   }
 
-  if (isCheckingSession) {
+  if (
+    isCheckingSession ||
+    (isAuthenticated && loadedDashboardEnvironment !== databaseEnvironment)
+  ) {
     return (
       <main className="loginPage">
-        <div className="sessionLoader" aria-label="관리자 접근 확인 중" />
+        <div
+          className="sessionLoader"
+          aria-label={isCheckingSession ? '관리자 접근 확인 중' : '대시보드 데이터 불러오는 중'}
+        />
       </main>
     );
   }
@@ -1533,7 +1571,9 @@ function DashboardPage({
     });
 
     return [...filteredPockets].sort(
-      (left, right) => right.memberCount - left.memberCount,
+      (left, right) =>
+        right.memberCount - left.memberCount ||
+        right.recordCount - left.recordCount,
     );
   }, [pocketQuery, pocketStatusFilter, pockets]);
 

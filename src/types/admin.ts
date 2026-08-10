@@ -66,6 +66,8 @@ export type VersionNote = {
 };
 
 export type AppUpdateMode = 'optional' | 'required';
+export type AppUpdatePlatform = 'android' | 'ios';
+export type AppUpdatePublishTarget = AppUpdatePlatform | 'all';
 
 export type AppUpdatePlatformConfig = {
   latestVersion: string;
@@ -91,6 +93,7 @@ export type AppUpdateConfig = {
 
 export type AppUpdateRelease = AppUpdateConfig & {
   id: string;
+  targetPlatform: AppUpdatePublishTarget;
 };
 
 export type MaintenanceStatus = 'scheduled' | 'in_progress' | 'extended';

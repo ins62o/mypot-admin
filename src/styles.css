@@ -3026,6 +3026,17 @@ tbody tr {
   gap: 6px;
 }
 
+.updatePlatformPublishNotice {
+  margin: -8px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.updatePlatformPublishNotice strong {
+  color: #111827;
+}
+
 .updateModeGroup button,
 .updatePlatformTabs button {
   background: #ffffff;

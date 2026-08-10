@@ -17,6 +17,7 @@ import type {
   AdminUser,
   AdminUserPage,
   AppUpdateConfig,
+  AppUpdatePublishTarget,
   AppUpdateRelease,
   DatabaseBackup,
   DatabaseBackupStatus,
@@ -161,11 +162,12 @@ export async function loadAdminAppUpdateConfig(
 
 export async function saveAdminAppUpdateConfig(
   config: AppUpdateConfig,
+  targetPlatform: AppUpdatePublishTarget,
   environment: DatabaseEnvironment = 'production',
 ): Promise<AppUpdateConfig> {
   const result = await callAdminFunction<{ config: AppUpdateConfig }>(
     'saveAdminAppUpdateConfig',
-    { ...config, environment },
+    { ...config, environment, targetPlatform },
   );
   return result.config;
 }

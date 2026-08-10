@@ -8,12 +8,44 @@ import {
   saveAdminAppUpdateConfig,
   type DatabaseEnvironment,
 } from '../services/firebaseAdminClient';
-import type { AppUpdateConfig, AppUpdateRelease } from '../types/admin';
+import type {
+  AppUpdateConfig,
+  AppUpdatePlatform,
+  AppUpdatePublishTarget,
+  AppUpdateRelease,
+} from '../types/admin';
 import { AppUpdateCard } from './AppUpdateCard';
 
 const FIXED_UPDATE_TITLE = '마이폿이 새로워졌어요';
 const FIXED_UPDATE_BUTTON_LABEL = '업데이트';
 const FIXED_DISMISS_LABEL = '나중에 하기';
+
+function platformLabel(platform: AppUpdatePlatform) {
+  return platform === 'ios' ? 'iOS' : 'Android';
+}
+
+function publishTargetLabel(target: AppUpdatePublishTarget) {
+  return target === 'all' ? 'iOS · Android' : platformLabel(target);
+}
+
+function releaseVersionLabel(release: AppUpdateRelease) {
+  if (release.targetPlatform === 'android') {
+    return `Android ${release.platforms.android.latestVersion}`;
+  }
+
+  if (release.targetPlatform === 'ios') {
+    return `iOS ${release.platforms.ios.latestVersion}`;
+  }
+
+  if (
+    release.platforms.ios.latestVersion ===
+    release.platforms.android.latestVersion
+  ) {
+    return `iOS · Android ${release.platforms.ios.latestVersion}`;
+  }
+
+  return `iOS ${release.platforms.ios.latestVersion} · Android ${release.platforms.android.latestVersion}`;
+}
 
 const defaultConfig: AppUpdateConfig = {
   buttonLabel: FIXED_UPDATE_BUTTON_LABEL,
@@ -48,7 +80,9 @@ export function AppUpdateManagement({
   environment: DatabaseEnvironment;
 }) {
   const [config, setConfig] = useState<AppUpdateConfig>(defaultConfig);
-  const [platform, setPlatform] = useState<'android' | 'ios'>('ios');
+  const [platform, setPlatform] = useState<AppUpdatePlatform>('ios');
+  const [publishTarget, setPublishTarget] =
+    useState<AppUpdatePublishTarget>('ios');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishConfirmOpen, setIsPublishConfirmOpen] = useState(false);
@@ -126,6 +160,20 @@ export function AppUpdateManagement({
     }));
   }
 
+  function selectPlatform(nextPlatform: AppUpdatePlatform) {
+    setPlatform(nextPlatform);
+    if (publishTarget !== 'all') {
+      setPublishTarget(nextPlatform);
+    }
+  }
+
+  function selectPublishTarget(nextTarget: AppUpdatePublishTarget) {
+    setPublishTarget(nextTarget);
+    if (nextTarget !== 'all') {
+      setPlatform(nextTarget);
+    }
+  }
+
   function requestPublish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!isSaving) setIsPublishConfirmOpen(true);
@@ -146,11 +194,12 @@ export function AppUpdateManagement({
           summary: '',
           title: FIXED_UPDATE_TITLE,
         },
+        publishTarget,
         environment,
       );
       setConfig(savedConfig);
       setReleases(await loadAdminAppUpdateReleases(environment));
-      setMessage('새 업데이트를 게시하고 사용자에게 적용했어요.');
+      setMessage(`${publishTargetLabel(publishTarget)} 업데이트를 게시하고 사용자에게 적용했어요.`);
     } catch {
       setMessage('게시하지 못했어요. 버전과 스토어 주소를 확인해 주세요.');
     } finally {
@@ -238,12 +287,44 @@ export function AppUpdateManagement({
                 className={platform === item ? 'active' : ''}
                 key={item}
                 type="button"
-                onClick={() => setPlatform(item)}
+                onClick={() => selectPlatform(item)}
               >
                 {item === 'ios' ? 'iOS' : 'Android'}
               </button>
             ))}
           </div>
+
+          <div className="updateModeGroup updatePublishTargetGroup">
+            <span>게시 대상</span>
+            <div>
+              {(['ios', 'android', 'all'] as const).map((target) => (
+                <button
+                  className={publishTarget === target ? 'active' : ''}
+                  key={target}
+                  type="button"
+                  onClick={() => selectPublishTarget(target)}
+                >
+                  {target === 'all'
+                    ? 'iOS + Android'
+                    : `${platformLabel(target)}만`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <p className="updatePlatformPublishNotice">
+            {publishTarget === 'all' ? (
+              <>
+                <strong>iOS와 Android</strong> 설정을 한 번에 게시하고 이력을 한
+                행으로 저장합니다.
+              </>
+            ) : (
+              <>
+                <strong>{platformLabel(publishTarget)}</strong>만 게시하며, 다른
+                플랫폼의 버전과 스토어 설정은 그대로 유지합니다.
+              </>
+            )}
+          </p>
 
           <div className="updateFieldGrid">
             <label>
@@ -330,14 +411,13 @@ export function AppUpdateManagement({
                 <article key={release.id}>
                   <div>
                     <strong>
-                      iOS {release.platforms.ios.latestVersion} · Android{' '}
-                      {release.platforms.android.latestVersion}
+                      {publishTargetLabel(release.targetPlatform)} 업데이트
                     </strong>
                     <span className={release.mode}>
                       {release.mode === 'required' ? '강제 업데이트' : '선택 업데이트'}
                     </span>
                   </div>
-                  <p>{release.title}</p>
+                  <p>{releaseVersionLabel(release)}</p>
                   <div className="updateReleaseFooter">
                     <small>
                       {release.publishedAt
@@ -375,7 +455,7 @@ export function AppUpdateManagement({
             ) : null}
           </div>
           <button disabled={isLoading || isSaving} type="submit">
-            {isSaving ? '게시 중' : '새 업데이트 게시'}
+            {isSaving ? '게시 중' : `${publishTargetLabel(publishTarget)} 업데이트 게시`}
           </button>
         </div>
       </form>
@@ -420,8 +500,14 @@ export function AppUpdateManagement({
             <span className={config.mode}>
               {config.mode === 'required' ? '강제 업데이트' : '선택 업데이트'}
             </span>
-            <h2 id="update-publish-confirm-title">이 업데이트를 게시할까요?</h2>
-            <p>즉시 반영되고 게시 이력이 저장됩니다.</p>
+            <h2 id="update-publish-confirm-title">
+              {publishTargetLabel(publishTarget)} 업데이트를 게시할까요?
+            </h2>
+            <p>
+              {publishTarget === 'all'
+                ? '두 플랫폼에 즉시 반영되며 게시 이력은 한 행으로 저장됩니다.'
+                : `${platformLabel(publishTarget)}에만 즉시 반영되며 다른 플랫폼 버전은 유지됩니다.`}
+            </p>
             {config.mode === 'required' ? (
               <strong>강제 업데이트는 이전 버전 사용자의 앱 이용을 제한할 수 있어요.</strong>
             ) : null}
@@ -453,10 +539,7 @@ export function AppUpdateManagement({
               사용자에게 즉시 반영되며, 직전 업데이트 설정과 최소 지원
               버전으로 복원됩니다.
             </p>
-            <strong>
-              iOS {releasePendingDeletion.platforms.ios.latestVersion} · Android{' '}
-              {releasePendingDeletion.platforms.android.latestVersion}
-            </strong>
+            <strong>{releaseVersionLabel(releasePendingDeletion)}</strong>
             <div>
               <button
                 disabled={isDeletingRelease}
