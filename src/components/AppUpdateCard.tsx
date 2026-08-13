@@ -1,6 +1,10 @@
 import appIcon from '../assets/app-icon.png';
 import type { AppUpdateConfig } from '../types/admin';
 
+const UPDATE_TITLE = '마이폿이 새로워졌어요';
+const UPDATE_BUTTON_LABEL = '업데이트';
+const DISMISS_BUTTON_LABEL = '나중에 하기';
+
 type AppUpdateCardProps = {
   config: AppUpdateConfig;
   platform: 'android' | 'ios';
@@ -13,7 +17,6 @@ export function AppUpdateCard({
   preview = false,
 }: AppUpdateCardProps) {
   const platformConfig = config.platforms[platform];
-  const visibleHighlights = config.highlights.slice(0, 3);
 
   return (
     <article className="updateWebCard">
@@ -25,16 +28,7 @@ export function AppUpdateCard({
       <p className="updateWebVersion">
         Version {platformConfig.latestVersion}
       </p>
-      <h1>{config.title}</h1>
-
-      <div className="updateWebHighlights">
-        {visibleHighlights.map((highlight, index) => (
-          <div key={`${highlight}-${index}`}>
-            <span aria-hidden="true">{index + 1}</span>
-            <p>{highlight}</p>
-          </div>
-        ))}
-      </div>
+      <h1>{UPDATE_TITLE}</h1>
 
       <div
         className={`updateWebActions ${
@@ -46,11 +40,11 @@ export function AppUpdateCard({
           href={preview ? undefined : platformConfig.storeUrl}
           onClick={preview ? (event) => event.preventDefault() : undefined}
         >
-          {config.buttonLabel}
+          {UPDATE_BUTTON_LABEL}
         </a>
         {config.mode === 'optional' ? (
           <button disabled={preview} type="button">
-            {config.dismissLabel}
+            {DISMISS_BUTTON_LABEL}
           </button>
         ) : null}
       </div>
