@@ -7,6 +7,12 @@
   pocketCount: number;
   joinedAt: string;
   lastLoginAt: string;
+  lastLoginAtTimestamp: number | null;
+  appVersion: string | null;
+  appBuildNumber: string | null;
+  osName: string | null;
+  osVersion: string | null;
+  deviceModel: string | null;
   status: 'active' | 'suspended';
   suspendedUntil: string | null;
   suspensionPermanent: boolean;

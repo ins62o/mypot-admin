@@ -479,16 +479,42 @@ button {
 .userStatusBadge { align-items: center; border: 1px solid; border-radius: 999px; display: inline-flex; font-size: 11px; font-weight: 900; justify-content: center; min-width: 46px; padding: 7px 10px; }
 .userStatusBadge.active { background: #eaf8f5; border-color: #b9e7dc; color: #15876d; }
 .userStatusBadge.suspended { background: #ffe8ed; border-color: #f3bac6; color: #b24d62; }
+.userAvatarStatusWrap { display: inline-flex; flex: 0 0 auto; height: 34px; position: relative; width: 34px; }
+.userAvatarStatus { border: 2px solid #fff; border-radius: 999px; bottom: -1px; height: 10px; position: absolute; right: -1px; width: 10px; }
+.userAvatarStatus.active { background: #20b979; }
+.userAvatarStatus.suspended { background: #e65757; }
+.pocketNameCell { align-items: center; display: flex; gap: 9px; }
+.pocketLevelWrap { display: inline-flex; flex: 0 0 auto; height: 38px; position: relative; width: 38px; }
+.pocketLevelValue { align-items: center; background: #fff3c4; border: 1px solid #f0d48a; border-radius: 999px; color: #6f4708; display: flex; font-size: 15px; font-weight: 900; height: 38px; justify-content: center; letter-spacing: -.03em; line-height: 1; width: 38px; }
+.pocketLevelStatus { border: 2px solid #fff; border-radius: 999px; bottom: -1px; height: 11px; position: absolute; right: -1px; width: 11px; }
+.pocketLevelStatus.active { background: #20b979; }
+.pocketLevelStatus.inactive { background: #e65757; }
 .userListControls { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .userStatusFilters { background: #fffaf0; border: 1px solid #ead7b7; border-radius: 10px; display: inline-flex; padding: 3px; }
 .userStatusFilters button { background: transparent; border: 0; border-radius: 7px; color: #8b7355; font-size: 12px; font-weight: 800; padding: 7px 10px; }
 .userStatusFilters button.active { background: #fff3c4; color: #6f4525; }
 .userDetailRow { cursor: pointer; }
 .userDetailRow:hover { background: #fff8e8; }
-.pocketMembersDialog.userDetailDialog { max-height: 88vh; max-width: 640px; overflow: auto; width: min(640px, calc(100vw - 40px)); }
-.userDetailContent { display: grid; gap: 18px; padding: 22px; }
+.pocketMembersDialog.userDetailDialog { max-height: 88vh; max-width: 760px; overflow: auto; width: min(760px, calc(100vw - 40px)); }
+.userDetailTabs { align-items: flex-end; background: #fffaf0; border-bottom: 1px solid #ead7b7; display: flex; gap: 5px; overflow-x: auto; padding: 12px 18px 0; }
+.userDetailTabs button { background: #fff3da; border: 1px solid #ead7b7; border-bottom: 0; border-radius: 11px 11px 0 0; color: #8b7355; flex: 0 0 auto; font-size: 12px; font-weight: 900; min-height: 42px; padding: 0 16px; }
+.userDetailTabs button.active { background: #fff; color: #5a371c; margin-bottom: -1px; min-height: 43px; position: relative; }
+.userDetailTabs button:focus-visible { outline: 3px solid rgba(246, 200, 76, .35); outline-offset: -3px; }
+.userDetailContent { display: grid; gap: 18px; min-height: 330px; padding: 22px; }
 .userDetailSummary { align-items: center; display: grid; gap: 12px; grid-template-columns: auto minmax(0, 1fr) auto; }
 .userDetailSummary small { color: #8b7355; display: block; margin-top: 4px; }
+.userInfoGrid { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
+.userInfoGrid > div { background: #fffaf0; border: 1px solid #f0dfc2; border-radius: 10px; display: grid; gap: 5px; min-width: 0; padding: 13px 14px; }
+.userInfoGrid > div.wide { grid-column: 1 / -1; }
+.userInfoGrid dt { color: #8b7355; font-size: 11px; font-weight: 900; }
+.userInfoGrid dd { color: #5a371c; font-size: 13px; font-weight: 800; margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.userInfoGrid code { background: transparent; font-family: inherit; font-size: 13px; font-weight: inherit; white-space: normal; }
+.userDevicePanel { align-content: start; }
+.userDevicePanel .userDetailSectionTitle h3 { margin-top: 3px; }
+.userDeviceEmpty { align-items: center; background: #fffaf0; border: 1px dashed #dfc59b; border-radius: 12px; color: #aa7b32; display: flex; flex-direction: column; gap: 7px; justify-content: center; min-height: 190px; padding: 24px; text-align: center; }
+.userDeviceEmpty strong { color: #6f4525; font-size: 14px; }
+.userDeviceEmpty span { color: #8b7355; font-size: 12px; }
+.userModerationPanel .userReportSection:first-child { border-top: 0; padding-top: 0; }
 .userReportSection, .userSuspensionSection { border-top: 1px solid #f0dfc2; display: grid; gap: 12px; padding-top: 18px; }
 .userDetailSectionTitle { align-items: center; display: flex; gap: 10px; justify-content: space-between; }
 .userDetailSectionTitle h3 { font-size: 16px; margin: 0; }
@@ -4752,5 +4778,28 @@ tbody tr {
   .pocketMembersDialog.moderationDialog {
     max-height: calc(100dvh - 28px);
     width: 100%;
+  }
+
+  .userDetailTabs {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .userDetailTabs button {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .userDetailContent {
+    min-height: 0;
+    padding: 18px 14px;
+  }
+
+  .userInfoGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .userInfoGrid > div.wide {
+    grid-column: auto;
   }
 }

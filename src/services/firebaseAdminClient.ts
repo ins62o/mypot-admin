@@ -36,6 +36,138 @@ type RawSupportInquiry = Omit<SupportInquiry, 'attachments' | 'status'> & {
   status?: string | null;
 };
 
+type NormalizedAdminUserFields =
+  | 'appBuildNumber'
+  | 'appVersion'
+  | 'deviceModel'
+  | 'lastLoginAtTimestamp'
+  | 'osName'
+  | 'osVersion';
+type RawAdminUser = Omit<AdminUser, NormalizedAdminUserFields> & Record<string, unknown>;
+type RawAdminUserPage = Omit<AdminUserPage, 'users'> & { users: RawAdminUser[] };
+
+function getStringValue(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  }
+
+  return null;
+}
+
+function getRecordValue(value: unknown) {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : null;
+}
+
+function getTimestamp(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value < 1_000_000_000_000 ? value * 1000 : value;
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const numericValue = Number(value);
+    if (Number.isFinite(numericValue) && /^\d+(?:\.\d+)?$/.test(value.trim())) {
+      return numericValue < 1_000_000_000_000 ? numericValue * 1000 : numericValue;
+    }
+
+    const parsedValue = Date.parse(value);
+    if (!Number.isNaN(parsedValue)) return parsedValue;
+
+    const koreanDateTime = value.trim().match(
+      /^(\d{4})\s*(?:년|[./-])\s*(\d{1,2})\s*(?:월|[./-])\s*(\d{1,2})\s*(?:일|\.)?(?:[,\s]+(?:(오전|오후)\s*)?(\d{1,2})(?:\s*(?::|시)\s*(\d{1,2}))?(?:\s*(?::|분)\s*(\d{1,2}))?\s*(?:초)?)?/,
+    );
+    if (koreanDateTime) {
+      const [, year, month, day, meridiem, rawHour = '0', minute = '0', second = '0'] = koreanDateTime;
+      let hour = Number(rawHour);
+      if (meridiem === '오후' && hour < 12) hour += 12;
+      if (meridiem === '오전' && hour === 12) hour = 0;
+      return Date.UTC(
+        Number(year),
+        Number(month) - 1,
+        Number(day),
+        hour - 9,
+        Number(minute),
+        Number(second),
+      );
+    }
+
+    return null;
+  }
+
+  if (value && typeof value === 'object') {
+    const timestamp = value as Record<string, unknown>;
+    const seconds = timestamp.seconds ?? timestamp._seconds;
+    if (typeof seconds === 'number' && Number.isFinite(seconds)) return seconds * 1000;
+  }
+
+  return null;
+}
+
+function getUserLastLoginTimestamp(user: RawAdminUser) {
+  const metadata = getRecordValue(user.metadata);
+  const candidates = [
+    user.lastLoginAtTimestamp,
+    user.lastLoginAtMs,
+    user.lastLoginTimestamp,
+    user.lastSignInTime,
+    user.lastLoginAt,
+    metadata?.lastSignInTime,
+    metadata?.lastLoginAt,
+  ];
+
+  for (const candidate of candidates) {
+    const timestamp = getTimestamp(candidate);
+    if (timestamp !== null) return timestamp;
+  }
+
+  return null;
+}
+
+function getUserDeviceInfo(user: RawAdminUser) {
+  const appInfo = getRecordValue(user.appInfo) ?? getRecordValue(user.application);
+  const deviceInfo = getRecordValue(user.deviceInfo) ?? getRecordValue(user.device);
+
+  return {
+    appBuildNumber: getStringValue(
+      user.appBuildNumber,
+      user.buildNumber,
+      user.build,
+      appInfo?.buildNumber,
+      appInfo?.build,
+    ),
+    appVersion: getStringValue(
+      user.appVersion,
+      user.installedAppVersion,
+      user.clientVersion,
+      appInfo?.version,
+      appInfo?.appVersion,
+    ),
+    deviceModel: getStringValue(
+      user.deviceModel,
+      user.deviceName,
+      user.model,
+      deviceInfo?.model,
+      deviceInfo?.deviceModel,
+      deviceInfo?.name,
+    ),
+    osName: getStringValue(
+      user.osName,
+      user.operatingSystem,
+      user.platform,
+      deviceInfo?.osName,
+      deviceInfo?.os,
+      deviceInfo?.platform,
+    ),
+    osVersion: getStringValue(
+      user.osVersion,
+      user.operatingSystemVersion,
+      user.systemVersion,
+      deviceInfo?.osVersion,
+      deviceInfo?.systemVersion,
+    ),
+  };
+}
+
 const firebaseConfig: FirebaseOptions = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
@@ -91,7 +223,19 @@ export async function loadAdminUsers(
   environment: DatabaseEnvironment = 'production',
   options: { page?: number; pageSize?: number; query?: string; status?: 'active' | 'all' | 'suspended' } = {},
 ): Promise<AdminUserPage> {
-  return callAdminFunction<AdminUserPage>('listAdminUsers', { environment, ...options });
+  const result = await callAdminFunction<RawAdminUserPage>('listAdminUsers', {
+    environment,
+    ...options,
+  });
+
+  return {
+    ...result,
+    users: result.users.map((user) => ({
+      ...user,
+      ...getUserDeviceInfo(user),
+      lastLoginAtTimestamp: getUserLastLoginTimestamp(user),
+    })),
+  };
 }
 
 export async function setAdminUserSuspension(

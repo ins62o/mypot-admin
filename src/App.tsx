@@ -51,9 +51,25 @@ const REPORT_REASON_LABELS: Record<string, string> = {
 const DATABASE_ENVIRONMENT_STORAGE_KEY = 'mypot-admin-database-environment';
 const ADMIN_LOGIN_ALIAS = 'mypot';
 const ADMIN_LOGIN_EMAIL = 'mypot.support@gmail.com';
+const adminDateFormatter = new Intl.DateTimeFormat('ko-KR', {
+  day: 'numeric',
+  month: 'long',
+  timeZone: 'Asia/Seoul',
+  year: 'numeric',
+});
+const adminDateTimeFormatter = new Intl.DateTimeFormat('ko-KR', {
+  day: 'numeric',
+  hour: 'numeric',
+  hour12: true,
+  minute: '2-digit',
+  month: 'long',
+  timeZone: 'Asia/Seoul',
+  year: 'numeric',
+});
 
 type AdminPage = 'dashboard' | 'database' | 'moderation' | 'updates' | 'versions' | 'support';
 type DataSourceStatus = 'firebase' | 'loading' | 'error';
+type UserDetailTab = 'device' | 'moderation' | 'profile';
 type EvidenceContentItem = { key: string; value: ReactNode };
 type EvidenceRow = { key: string; label: string; value: ReactNode };
 
@@ -281,6 +297,18 @@ const hiddenEvidenceKeys = new Set([
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function formatAdminDate(value: number | string | null) {
+  if (value === null || value === '') return '-';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '-' : adminDateFormatter.format(date);
+}
+
+function formatAdminDateTime(value: number | string | null) {
+  if (value === null || value === '') return '-';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '-' : adminDateTimeFormatter.format(date);
 }
 
 function isUrl(value: string) {
@@ -1550,6 +1578,7 @@ function DashboardPage({
   const [pocketPage, setPocketPage] = useState(1);
   const [selectedPocket, setSelectedPocket] = useState<AdminPocket | null>(null);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [userDetailTab, setUserDetailTab] = useState<UserDetailTab>('profile');
   const [suspensionDays, setSuspensionDays] = useState('');
   const [suspensionPreset, setSuspensionPreset] = useState<3 | 7 | 30 | 'permanent' | null>(null);
   const [suspensionBusy, setSuspensionBusy] = useState(false);
@@ -1579,11 +1608,27 @@ function DashboardPage({
 
   const userPageCount = Math.max(1, Math.ceil(userTotalCount / PAGE_SIZE));
   const pocketPageCount = Math.max(1, Math.ceil(sortedPockets.length / PAGE_SIZE));
-  const visibleUsers = users;
+  const visibleUsers = useMemo(
+    () => [...users].sort((left, right) => {
+      const leftTimestamp = left.lastLoginAtTimestamp ?? 0;
+      const rightTimestamp = right.lastLoginAtTimestamp ?? 0;
+      return rightTimestamp - leftTimestamp;
+    }),
+    [users],
+  );
   const visiblePockets = paginate(sortedPockets, pocketPage);
   const selectedUserReports = selectedUser
     ? reports.filter(report => report.status === 'resolved' && [report.targetUid, report.targetId, report.evidence.authorUid].includes(selectedUser.id))
     : [];
+  const hasSelectedUserDeviceInfo = Boolean(
+    selectedUser && [
+      selectedUser.appBuildNumber,
+      selectedUser.appVersion,
+      selectedUser.deviceModel,
+      selectedUser.osName,
+      selectedUser.osVersion,
+    ].some(Boolean),
+  );
 
   async function updateSuspension(options: { durationDays?: number; lift?: boolean; permanent?: boolean }) {
     if (!selectedUser) return;
@@ -1676,23 +1721,21 @@ function DashboardPage({
             <table>
               <thead>
                 <tr>
-                  <th>상태</th>
                   <th>사용자</th>
                   <th>로그인</th>
                   <th>참여</th>
-                  <th>가입일</th>
                   <th>최근 로그인</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleUsers.map((user) => (
-                  <tr className="userDetailRow" key={user.id} onClick={() => { setSelectedUser(user); setSuspensionError(''); setSuspensionDays(''); setSuspensionPreset(null); }}>
-                    <td><UserStatusBadge status={user.status} /></td>
+                  <tr className="userDetailRow" key={user.id} onClick={() => { setSelectedUser(user); setUserDetailTab('profile'); setSuspensionError(''); setSuspensionDays(''); setSuspensionPreset(null); }}>
                     <td>
                       <div className="userCell">
-                        <UserAvatar
+                        <UserAvatarWithStatus
                           displayName={user.displayName}
                           photoURL={user.photoURL}
+                          status={user.status}
                         />
                         <div>
                           <strong>{user.displayName}</strong>
@@ -1703,13 +1746,12 @@ function DashboardPage({
                       <ProviderBadge provider={user.provider} />
                     </td>
                     <td>{user.pocketCount}개</td>
-                    <td>{user.joinedAt}</td>
-                    <td>{user.lastLoginAt}</td>
+                    <td>{formatAdminDate(user.lastLoginAtTimestamp ?? user.lastLoginAt)}</td>
                   </tr>
                 ))}
                 {visibleUsers.length === 0 ? (
                   <tr>
-                    <td className="emptyTableCell" colSpan={6}>
+                    <td className="emptyTableCell" colSpan={4}>
                       데이터 없음
                     </td>
                   </tr>
@@ -1766,14 +1808,12 @@ function DashboardPage({
                   <th>주머니</th>
                   <th>구성원</th>
                   <th>기록</th>
-                  <th>레벨</th>
-                  <th>상태</th>
                 </tr>
               </thead>
               <tbody>
                 {visiblePockets.map((pocketItem) => (
                   <tr
-                    aria-label={`${pocketItem.name} 참여자 보기`}
+                    aria-label={`${pocketItem.name}, ${statusLabel[pocketItem.status]}, 참여자 보기`}
                     className="pocketMemberRow"
                     key={pocketItem.id}
                     role="button"
@@ -1787,21 +1827,21 @@ function DashboardPage({
                     }}
                   >
                     <td>
-                      <strong>{pocketItem.name}</strong>
+                      <div className="pocketNameCell">
+                        <PocketLevelIndicator
+                          active={pocketItem.status === 'active'}
+                          level={pocketItem.level}
+                        />
+                        <strong>{pocketItem.name}</strong>
+                      </div>
                     </td>
                     <td>{pocketItem.memberCount}명</td>
                     <td>{pocketItem.recordCount}개</td>
-                    <td>
-                      <span className="levelChip">Lv.{pocketItem.level}</span>
-                    </td>
-                    <td>
-                      <StatusBadge status={pocketItem.status} />
-                    </td>
                   </tr>
                 ))}
                 {visiblePockets.length === 0 ? (
                   <tr>
-                    <td className="emptyTableCell" colSpan={5}>
+                    <td className="emptyTableCell" colSpan={3}>
                       데이터 없음
                     </td>
                   </tr>
@@ -1825,27 +1865,108 @@ function DashboardPage({
               <div><p className="eyebrow">사용자 상세</p><h2 id="user-detail-title">{selectedUser.displayName}</h2></div>
               <button className="pocketMembersClose" onClick={() => setSelectedUser(null)} type="button">닫기</button>
             </div>
-            <div className="userDetailContent">
-              <div className="userDetailSummary">
-                <UserAvatar displayName={selectedUser.displayName} photoURL={selectedUser.photoURL} />
-                <div><strong>{selectedUser.displayName}</strong></div>
-                <UserStatusBadge status={selectedUser.status} />
-              </div>
-              <section className="userReportSection">
-                <div className="userDetailSectionTitle"><h3>처리 신고</h3><ReportCountBadge count={selectedUserReports.length} /></div>
-                {selectedUserReports.length ? <div className="userReportList">{selectedUserReports.map(report => (
-                  <div key={report.id}><strong>{report.targetType === 'feed' ? '피드' : report.targetType === 'chatMessage' ? '채팅' : '사용자'} · {REPORT_REASON_LABELS[report.reason] ?? report.reason}</strong><span>{report.resolvedAt ? new Date(report.resolvedAt).toLocaleString('ko-KR') : '-'}</span></div>
-                ))}</div> : <p className="userDetailEmpty">처리 완료된 신고가 없습니다.</p>}
-              </section>
-              <section className="userSuspensionSection">
-                <div className="userDetailSectionTitle"><h3>계정 정지</h3></div>
-                {selectedUser.status === 'suspended' ? <p className="suspensionCurrent">{selectedUser.suspensionPermanent ? '영구 정지 중' : `${selectedUser.suspendedUntil ? new Date(selectedUser.suspendedUntil).toLocaleString('ko-KR') : '-'}까지 정지`}</p> : <p className="suspensionHelp">기간을 선택하거나 직접 일수를 입력해 주세요.</p>}
-                <div className="suspensionPresets">{([3, 7, 30] as const).map(days => <button className={suspensionPreset === days ? 'selected' : ''} disabled={suspensionBusy} key={days} onClick={() => { setSuspensionPreset(days); setSuspensionDays(''); }} type="button">{days}일</button>)}<button className={`danger ${suspensionPreset === 'permanent' ? 'selected' : ''}`} disabled={suspensionBusy} onClick={() => { setSuspensionPreset('permanent'); setSuspensionDays(''); }} type="button">영구</button></div>
-                <div className="suspensionCustom"><label htmlFor="suspension-days">직접 입력</label><div><input id="suspension-days" inputMode="numeric" min="1" max="3650" onChange={event => { setSuspensionDays(event.target.value.replace(/\D/g, '')); setSuspensionPreset(null); }} placeholder="일수" type="text" value={suspensionDays} /><button disabled={suspensionBusy || (!suspensionPreset && (!suspensionDays || Number(suspensionDays) < 1 || Number(suspensionDays) > 3650))} onClick={() => setPendingSuspension(suspensionPreset === 'permanent' ? { permanent: true } : { durationDays: typeof suspensionPreset === 'number' ? suspensionPreset : Number(suspensionDays) })} type="button">정지 적용</button></div></div>
-                {suspensionError ? <p className="moderationError">{suspensionError}</p> : null}
-                {selectedUser.status === 'suspended' ? <button className="suspensionLift" disabled={suspensionBusy} onClick={() => updateSuspension({ lift: true })} type="button">정지 해제</button> : null}
-              </section>
+            <div aria-label="사용자 상세 메뉴" className="userDetailTabs" role="tablist">
+              {([
+                ['profile', '사용자 정보'],
+                ['device', '앱 · 기기 정보'],
+                ['moderation', '정지 · 신고 관리'],
+              ] as const).map(([value, label]) => (
+                <button
+                  aria-controls={`user-detail-panel-${value}`}
+                  aria-selected={userDetailTab === value}
+                  className={userDetailTab === value ? 'active' : ''}
+                  id={`user-detail-tab-${value}`}
+                  key={value}
+                  role="tab"
+                  type="button"
+                  onClick={() => setUserDetailTab(value)}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
+
+            {userDetailTab === 'profile' ? (
+              <div
+                aria-labelledby="user-detail-tab-profile"
+                className="userDetailContent"
+                id="user-detail-panel-profile"
+                role="tabpanel"
+              >
+                <div className="userDetailSummary">
+                  <UserAvatarWithStatus
+                    displayName={selectedUser.displayName}
+                    photoURL={selectedUser.photoURL}
+                    status={selectedUser.status}
+                  />
+                  <div>
+                    <strong>{selectedUser.displayName}</strong>
+                    <small>{selectedUser.email || '이메일 없음'}</small>
+                  </div>
+                  <UserStatusBadge status={selectedUser.status} />
+                </div>
+                <dl className="userInfoGrid">
+                  <div><dt>사용자 ID</dt><dd><code>{selectedUser.id}</code></dd></div>
+                  <div><dt>이메일</dt><dd>{selectedUser.email || '-'}</dd></div>
+                  <div><dt>로그인 방식</dt><dd>{selectedUser.provider === 'Kakao' ? '카카오' : '애플'}</dd></div>
+                  <div><dt>참여 주머니</dt><dd>{selectedUser.pocketCount.toLocaleString('ko-KR')}개</dd></div>
+                  <div><dt>가입일</dt><dd>{formatAdminDate(selectedUser.joinedAt)}</dd></div>
+                  <div><dt>최근 로그인</dt><dd>{formatAdminDateTime(selectedUser.lastLoginAtTimestamp ?? selectedUser.lastLoginAt)}</dd></div>
+                </dl>
+              </div>
+            ) : null}
+
+            {userDetailTab === 'device' ? (
+              <div
+                aria-labelledby="user-detail-tab-device"
+                className="userDetailContent userDevicePanel"
+                id="user-detail-panel-device"
+                role="tabpanel"
+              >
+                <div className="userDetailSectionTitle">
+                  <div><p className="eyebrow">설치 환경</p><h3>앱 및 기기 정보</h3></div>
+                </div>
+                {hasSelectedUserDeviceInfo ? (
+                  <dl className="userInfoGrid deviceInfoGrid">
+                    <div><dt>설치 버전</dt><dd>{selectedUser.appVersion || '-'}</dd></div>
+                    <div><dt>빌드 번호</dt><dd>{selectedUser.appBuildNumber || '-'}</dd></div>
+                    <div><dt>운영체제</dt><dd>{selectedUser.osName || '-'}</dd></div>
+                    <div><dt>OS 버전</dt><dd>{selectedUser.osVersion || '-'}</dd></div>
+                    <div className="wide"><dt>기기 모델</dt><dd>{selectedUser.deviceModel || '-'}</dd></div>
+                  </dl>
+                ) : (
+                  <div className="userDeviceEmpty">
+                    <Smartphone aria-hidden="true" size={22} />
+                    <strong>수집된 앱·기기 정보가 없습니다.</strong>
+                    <span>사용자가 앱에 다시 접속하면 정보가 표시될 수 있습니다.</span>
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            {userDetailTab === 'moderation' ? (
+              <div
+                aria-labelledby="user-detail-tab-moderation"
+                className="userDetailContent userModerationPanel"
+                id="user-detail-panel-moderation"
+                role="tabpanel"
+              >
+                <section className="userReportSection">
+                  <div className="userDetailSectionTitle"><h3>처리 신고</h3><ReportCountBadge count={selectedUserReports.length} /></div>
+                  {selectedUserReports.length ? <div className="userReportList">{selectedUserReports.map(report => (
+                    <div key={report.id}><strong>{report.targetType === 'feed' ? '피드' : report.targetType === 'chatMessage' ? '채팅' : '사용자'} · {REPORT_REASON_LABELS[report.reason] ?? report.reason}</strong><span>{report.resolvedAt ? new Date(report.resolvedAt).toLocaleString('ko-KR') : '-'}</span></div>
+                  ))}</div> : <p className="userDetailEmpty">처리 완료된 신고가 없습니다.</p>}
+                </section>
+                <section className="userSuspensionSection">
+                  <div className="userDetailSectionTitle"><h3>계정 정지</h3></div>
+                  {selectedUser.status === 'suspended' ? <p className="suspensionCurrent">{selectedUser.suspensionPermanent ? '영구 정지 중' : `${selectedUser.suspendedUntil ? new Date(selectedUser.suspendedUntil).toLocaleString('ko-KR') : '-'}까지 정지`}</p> : <p className="suspensionHelp">기간을 선택하거나 직접 일수를 입력해 주세요.</p>}
+                  <div className="suspensionPresets">{([3, 7, 30] as const).map(days => <button className={suspensionPreset === days ? 'selected' : ''} disabled={suspensionBusy} key={days} onClick={() => { setSuspensionPreset(days); setSuspensionDays(''); }} type="button">{days}일</button>)}<button className={`danger ${suspensionPreset === 'permanent' ? 'selected' : ''}`} disabled={suspensionBusy} onClick={() => { setSuspensionPreset('permanent'); setSuspensionDays(''); }} type="button">영구</button></div>
+                  <div className="suspensionCustom"><label htmlFor="suspension-days">직접 입력</label><div><input id="suspension-days" inputMode="numeric" min="1" max="3650" onChange={event => { setSuspensionDays(event.target.value.replace(/\D/g, '')); setSuspensionPreset(null); }} placeholder="일수" type="text" value={suspensionDays} /><button disabled={suspensionBusy || (!suspensionPreset && (!suspensionDays || Number(suspensionDays) < 1 || Number(suspensionDays) > 3650))} onClick={() => setPendingSuspension(suspensionPreset === 'permanent' ? { permanent: true } : { durationDays: typeof suspensionPreset === 'number' ? suspensionPreset : Number(suspensionDays) })} type="button">정지 적용</button></div></div>
+                  {suspensionError ? <p className="moderationError">{suspensionError}</p> : null}
+                  {selectedUser.status === 'suspended' ? <button className="suspensionLift" disabled={suspensionBusy} onClick={() => updateSuspension({ lift: true })} type="button">정지 해제</button> : null}
+                </section>
+              </div>
+            ) : null}
           </section>
         </div>
       ) : null}
@@ -3136,6 +3257,40 @@ function ReportCountBadge({ count }: { count: number }) {
 
 function UserStatusBadge({ status }: { status: AdminUser['status'] }) {
   return <span className={`userStatusBadge ${status}`}>{status === 'suspended' ? '정지' : '활성'}</span>;
+}
+
+function UserAvatarWithStatus({
+  displayName,
+  photoURL,
+  status,
+}: UserAvatarProps & { status: AdminUser['status'] }) {
+  const label = status === 'active' ? '활성' : '정지';
+
+  return (
+    <span className="userAvatarStatusWrap">
+      <UserAvatar displayName={displayName} photoURL={photoURL} />
+      <span aria-hidden="true" className={`userAvatarStatus ${status}`} />
+      <span className="srOnly">{label}</span>
+    </span>
+  );
+}
+
+function PocketLevelIndicator({
+  active,
+  level,
+}: {
+  active: boolean;
+  level: number;
+}) {
+  const status = active ? '운영 중' : '삭제 대기';
+
+  return (
+    <span className="pocketLevelWrap">
+      <span aria-hidden="true" className="pocketLevelValue">{level}</span>
+      <span aria-hidden="true" className={`pocketLevelStatus ${active ? 'active' : 'inactive'}`} />
+      <span className="srOnly">레벨 {level}, {status}</span>
+    </span>
+  );
 }
 
 function ProviderBadge({ provider }: { provider: 'Kakao' | 'Apple' }) {
