@@ -483,12 +483,47 @@ button {
 .userAvatarStatus { border: 2px solid #fff; border-radius: 999px; bottom: -1px; height: 10px; position: absolute; right: -1px; width: 10px; }
 .userAvatarStatus.active { background: #20b979; }
 .userAvatarStatus.suspended { background: #e65757; }
-.pocketNameCell { align-items: center; display: flex; gap: 9px; }
-.pocketLevelWrap { display: inline-flex; flex: 0 0 auto; height: 38px; position: relative; width: 38px; }
-.pocketLevelValue { align-items: center; background: #fff3c4; border: 1px solid #f0d48a; border-radius: 999px; color: #6f4708; display: flex; font-size: 15px; font-weight: 900; height: 38px; justify-content: center; letter-spacing: -.03em; line-height: 1; width: 38px; }
-.pocketLevelStatus { border: 2px solid #fff; border-radius: 999px; bottom: -1px; height: 11px; position: absolute; right: -1px; width: 11px; }
-.pocketLevelStatus.active { background: #20b979; }
-.pocketLevelStatus.inactive { background: #e65757; }
+.pocketNameCell { align-items: center; display: flex; gap: 8px; min-width: 0; }
+.pocketNameCell > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pocketLevelWrap { background: #fff3c4; border: 1px solid #f0d48a; border-radius: 999px; color: #805b10; display: inline-flex; flex: 0 0 auto; font-size: 10px; font-weight: 900; line-height: 1; padding: 5px 7px; }
+.pocketMobileSort { display: none; }
+.pocketStatusTable th:nth-child(2) { width: 120px; }
+.pocketStatusTable th:nth-child(3),
+.pocketStatusTable th:nth-child(4) { width: 118px; }
+.pocketStatusTable th:last-child { width: 48px; }
+.pocketStatusTable th:nth-child(2),
+.pocketStatusTable th:nth-child(3),
+.pocketStatusTable th:nth-child(4) { text-align: center; }
+.pocketSortButton { align-items: center; background: transparent; border: 0; color: inherit; display: inline-flex; font: inherit; gap: 4px; padding: 0; }
+.pocketSortButton svg, .pocketMobileSort button svg { transition: transform 150ms ease; }
+.pocketSortButton svg.ascending, .pocketMobileSort button svg.ascending { transform: rotate(180deg); }
+.pocketStatusCell { text-align: center; white-space: nowrap; }
+.pocketMetricCell { text-align: center; }
+.pocketMetricCell strong { color: #5a371c; font-size: 13px; }
+.pocketRowAction { color: #b99d7a; text-align: center; }
+.pocketRowAction svg { display: inline-block; transition: transform 150ms ease; vertical-align: middle; }
+.userStatusTable th:nth-child(2),
+.userStatusTable th:nth-child(3),
+.userStatusTable th:nth-child(4),
+.userStatusTable td:nth-child(2),
+.userStatusTable td:nth-child(3),
+.userStatusTable td:nth-child(4) { text-align: center; }
+.userStatusTable td:nth-child(3),
+.userStatusTable td:nth-child(4) { font-weight: 900; }
+.userStatusTable th:nth-child(2),
+.userStatusTable th:nth-child(3) { width: 88px; }
+.userStatusTable th:nth-child(4) { width: 126px; }
+.userStatusTable th:last-child { width: 48px; }
+.userRowAction { color: #b99d7a; text-align: center; }
+.userRowAction svg { display: inline-block; transition: transform 150ms ease; vertical-align: middle; }
+.userDetailRow:hover .userRowAction svg { transform: translateX(2px); }
+.userDetailRow:focus-visible { outline: none; }
+.userDetailRow:focus-visible td { background: #fff5dc; }
+.userDetailRow:focus-visible td:first-child { box-shadow: inset 3px 0 0 #f6c84c; }
+.userSortButton { align-items: center; background: transparent; border: 0; color: inherit; display: inline-flex; font: inherit; gap: 4px; padding: 0; }
+.userSortButton svg { transition: transform 150ms ease; }
+.userSortButton svg.ascending { transform: rotate(180deg); }
+.userSortButton:focus-visible { outline: 3px solid rgba(246, 200, 76, .35); outline-offset: 3px; }
 .userListControls { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .userStatusFilters { background: #fffaf0; border: 1px solid #ead7b7; border-radius: 10px; display: inline-flex; padding: 3px; }
 .userStatusFilters button { background: transparent; border: 0; border-radius: 7px; color: #8b7355; font-size: 12px; font-weight: 800; padding: 7px 10px; }
@@ -502,38 +537,62 @@ button {
 .userDetailTabs button:focus-visible { outline: 3px solid rgba(246, 200, 76, .35); outline-offset: -3px; }
 .userDetailContent { display: grid; gap: 18px; min-height: 330px; padding: 22px; }
 .userDetailSummary { align-items: center; display: grid; gap: 12px; grid-template-columns: auto minmax(0, 1fr) auto; }
-.userDetailSummary small { color: #8b7355; display: block; margin-top: 4px; }
 .userInfoGrid { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
 .userInfoGrid > div { background: #fffaf0; border: 1px solid #f0dfc2; border-radius: 10px; display: grid; gap: 5px; min-width: 0; padding: 13px 14px; }
 .userInfoGrid > div.wide { grid-column: 1 / -1; }
 .userInfoGrid dt { color: #8b7355; font-size: 11px; font-weight: 900; }
 .userInfoGrid dd { color: #5a371c; font-size: 13px; font-weight: 800; margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .userInfoGrid code { background: transparent; font-family: inherit; font-size: 13px; font-weight: inherit; white-space: normal; }
-.userDevicePanel { align-content: start; }
-.userDevicePanel .userDetailSectionTitle h3 { margin-top: 3px; }
-.userDeviceEmpty { align-items: center; background: #fffaf0; border: 1px dashed #dfc59b; border-radius: 12px; color: #aa7b32; display: flex; flex-direction: column; gap: 7px; justify-content: center; min-height: 190px; padding: 24px; text-align: center; }
-.userDeviceEmpty strong { color: #6f4525; font-size: 14px; }
-.userDeviceEmpty span { color: #8b7355; font-size: 12px; }
+.userInfoValueWithAction { align-items: center; display: flex; gap: 8px; justify-content: space-between; }
+.userInfoValueWithAction code, .userInfoValueWithAction span { min-width: 0; overflow-wrap: anywhere; }
+.userInfoValueWithAction button { align-items: center; background: #fff; border: 1px solid #ead7b7; border-radius: 8px; color: #8b7355; display: inline-flex; flex: 0 0 28px; height: 28px; justify-content: center; padding: 0; width: 28px; }
+.userInfoValueWithAction button:hover { background: #fff3c4; color: #6f4525; }
+.userInfoValueWithAction button:focus-visible { outline: 3px solid rgba(246, 200, 76, .35); outline-offset: 1px; }
 .userModerationPanel .userReportSection:first-child { border-top: 0; padding-top: 0; }
 .userReportSection, .userSuspensionSection { border-top: 1px solid #f0dfc2; display: grid; gap: 12px; padding-top: 18px; }
 .userDetailSectionTitle { align-items: center; display: flex; gap: 10px; justify-content: space-between; }
 .userDetailSectionTitle h3 { font-size: 16px; margin: 0; }
 .userReportList { display: grid; gap: 8px; }
 .userReportList > div { align-items: center; background: #fffaf0; border: 1px solid #f5e8cc; border-radius: 9px; display: flex; justify-content: space-between; padding: 11px 12px; }
-.userReportList span, .userDetailEmpty, .suspensionHelp { color: #8b7355; font-size: 12px; margin: 0; }
-.suspensionCurrent { color: #b24d62; font-size: 13px; font-weight: 800; margin: 0; }
-.suspensionPresets { display: flex; flex-wrap: wrap; gap: 8px; }
-.suspensionPresets button, .suspensionCustom button, .suspensionLift { background: #fff; border: 1px solid #dfc59b; border-radius: 9px; color: #6f4525; font-weight: 800; padding: 10px 14px; }
-.suspensionCustom button { background: #b24d62; border-color: #b24d62; color: #fff; }
-.suspensionPresets button.selected { background: #fff3c4; border-color: #dfae2a; box-shadow: 0 0 0 2px rgba(246, 200, 76, .18); color: #6f4525; }
-.suspensionPresets button.danger.selected { background: #b24d62; border-color: #8f3549; box-shadow: 0 0 0 3px rgba(178, 77, 98, .2); color: #fff; }
-.suspensionCustom { display: grid; gap: 7px; }
-.suspensionCustom label { color: #8b7355; font-size: 12px; font-weight: 800; }
-.suspensionCustom > div { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) auto; }
-.suspensionCustom input { border: 1px solid #dfc59b; border-radius: 9px; color: #5a371c; font: inherit; padding: 10px 12px; }
-.suspensionCustom input:focus { border-color: #dfae2a; box-shadow: 0 0 0 3px rgba(246, 200, 76, .2); outline: none; }
-.suspensionPresets button:disabled, .suspensionCustom button:disabled, .suspensionLift:disabled { opacity: .5; }
-.suspensionLift { justify-self: start; }
+.userReportList span, .userDetailEmpty { color: #8b7355; font-size: 12px; margin: 0; }
+.suspensionSectionTitle { align-items: flex-start; }
+.suspensionSectionTitle p { color: #8b7355; font-size: 12px; line-height: 18px; margin: 5px 0 0; }
+.suspensionStatusBanner { align-items: center; background: #fff1f3; border: 1px solid #f3bac6; border-radius: 12px; display: flex; gap: 14px; justify-content: space-between; padding: 12px 14px; }
+.suspensionStatusBanner > div { display: grid; gap: 3px; }
+.suspensionStatusBanner span { color: #a85a6b; font-size: 11px; font-weight: 800; }
+.suspensionStatusBanner strong { color: #9f3f54; font-size: 13px; }
+.suspensionLift { background: #fff; border: 1px solid #df9baa; border-radius: 9px; color: #9f3f54; flex: 0 0 auto; font-size: 12px; font-weight: 900; min-height: 36px; padding: 0 12px; }
+.suspensionControlPanel { background: #fffaf0; border: 1px solid #f0dfc2; border-radius: 14px; display: grid; gap: 16px; padding: 16px; }
+.suspensionPresetFieldset { border: 0; margin: 0; min-width: 0; padding: 0; }
+.suspensionPresetFieldset legend { color: #7a5a3c; display: block; font-size: 12px; font-weight: 900; margin-bottom: 8px; padding: 0; width: 100%; }
+.suspensionPresets { display: grid; gap: 8px; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.suspensionPresets button { background: #fff; border: 1px solid #e4cfaa; border-radius: 10px; color: #6f4525; font-weight: 900; min-height: 44px; padding: 0 10px; }
+.suspensionPresets button.selected { background: #fff0b8; border-color: #dfae2a; box-shadow: inset 0 0 0 1px #dfae2a; color: #65400f; }
+.suspensionPresets button.permanent { color: #a34a5e; }
+.suspensionPresets button.permanent.selected { background: #ffe8ed; border-color: #d98295; box-shadow: inset 0 0 0 1px #d98295; color: #983e53; }
+.suspensionInlineCustom { align-items: center; background: #fff; border: 1px solid #e4cfaa; border-radius: 10px; display: grid; grid-template-columns: minmax(0, 1fr) auto; min-height: 44px; min-width: 0; overflow: hidden; }
+.suspensionInlineCustom:focus-within, .suspensionInlineCustom.selected { border-color: #dfae2a; box-shadow: inset 0 0 0 1px #dfae2a, 0 0 0 3px rgba(246, 200, 76, .16); }
+.suspensionInlineCustom.error { border-color: #d98295; box-shadow: inset 0 0 0 1px #d98295, 0 0 0 3px rgba(178, 77, 98, .12); }
+.suspensionInlineCustom input { background: transparent; border: 0; color: #65400f; font: inherit; font-weight: 900; min-width: 0; outline: 0; padding: 11px 4px 11px 10px; text-align: center; }
+.suspensionInlineCustom input::placeholder { color: #6f4525; opacity: 1; }
+.suspensionInlineCustom > span { color: #8b7355; font-size: 12px; font-weight: 900; padding-right: 9px; }
+.suspensionInlineCustom:has(input:disabled) { background: #f5eee3; opacity: .5; }
+.suspensionPresetFieldset > small { color: #9b8061; display: block; font-size: 11px; line-height: 17px; margin-top: 6px; }
+.suspensionPresetFieldset > small.error { color: #b24d62; font-weight: 800; }
+.suspensionActionBar { align-items: center; border-top: 1px solid #f0dfc2; display: flex; gap: 16px; justify-content: space-between; padding-top: 14px; }
+.suspensionActionBar > div { display: grid; gap: 3px; }
+.suspensionActionBar span { color: #8b7355; font-size: 11px; font-weight: 800; }
+.suspensionActionBar strong { color: #5a371c; font-size: 14px; }
+.suspensionApply { align-items: center; background: #b24d62; border: 1px solid #9f3f54; border-radius: 10px; box-shadow: 0 5px 12px rgba(178, 77, 98, .16); color: #fff; display: inline-flex; flex: 0 0 auto; font-weight: 900; gap: 6px; justify-content: center; min-height: 44px; padding: 0 16px; }
+.suspensionApply:disabled { background: #e8d9dc; border-color: #e8d9dc; box-shadow: none; color: #a88d93; cursor: not-allowed; }
+.suspensionPresets button:disabled, .suspensionLift:disabled { cursor: not-allowed; opacity: .5; }
+.suspensionPresets button:focus-visible, .suspensionLift:focus-visible, .suspensionApply:focus-visible { outline: 3px solid rgba(246, 200, 76, .38); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .suspensionPresets button:not(.selected):not(:disabled):hover { background: #fff6d6; border-color: #d9b95e; }
+  .suspensionLift:not(:disabled):hover { background: #fff1f3; }
+  .suspensionApply:not(:disabled):hover { background: #9f3f54; }
+}
+.suspensionPresets button:not(:disabled):active, .suspensionLift:not(:disabled):active, .suspensionApply:not(:disabled):active { transform: translateY(1px); }
 .suspensionConfirmDialog { max-width: 400px; }
 .suspensionConfirmDialog .logoutConfirmActions button:last-child { background: #b24d62; border-color: #9f3f54; color: #fff; }
 .pocketMembersDialog.moderationDialog { max-height: 88vh; max-width: 760px; overflow: auto; scrollbar-color: #c9a875 #fffdf7; scrollbar-width: thin; width: min(760px, calc(100vw - 40px)); }
@@ -1312,24 +1371,20 @@ th {
 .pagination {
   align-items: center;
   display: flex;
-  justify-content: space-between;
+  gap: 6px;
+  justify-content: center;
   min-height: 54px;
+  overflow-x: auto;
   padding: 10px 14px;
+  scrollbar-width: none;
 }
 
 .paginationHidden {
   display: none;
 }
 
-.pagination span {
-  color: #8b7355;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.pagination div {
-  display: flex;
-  gap: 6px;
+.pagination::-webkit-scrollbar {
+  display: none;
 }
 
 .pagination button {
@@ -1340,12 +1395,14 @@ th {
   font-size: 12px;
   font-weight: 800;
   height: 32px;
-  padding: 0 10px;
+  padding: 0;
+  width: 32px;
 }
 
-.pagination button:disabled {
-  cursor: not-allowed;
-  opacity: 0.42;
+.pagination button.current {
+  background: #f6c84c;
+  border-color: #f6c84c;
+  color: #5a371c;
 }
 
 @media (max-width: 1180px) {
@@ -1433,6 +1490,10 @@ tbody tr {
 
 .pocketMemberRow:hover td {
   background: #fffaf0;
+}
+
+.pocketMemberRow:hover .pocketRowAction svg {
+  transform: translateX(2px);
 }
 
 .pocketMemberRow:focus-visible {
@@ -2475,11 +2536,168 @@ tbody tr {
   width: 100%;
 }
 
+.pocketMembersDialog.pocketDetailDialog {
+  max-height: 88vh;
+  max-width: 760px;
+  overflow: auto;
+  scrollbar-color: #c9a875 #fffdf7;
+  scrollbar-width: thin;
+  width: min(760px, calc(100vw - 40px));
+}
+
+.pocketDetailDialog::-webkit-scrollbar { width: 12px; }
+.pocketDetailDialog::-webkit-scrollbar-track { background: #fffdf7; border-left: 1px solid #f5e8cc; }
+.pocketDetailDialog::-webkit-scrollbar-thumb { background: #d6b783; border: 3px solid #fffdf7; border-radius: 999px; }
+.pocketDetailDialog::-webkit-scrollbar-thumb:hover { background: #bd925a; }
+
 .pocketMembersDialog .panelHeader {
   align-items: center;
   display: flex;
   justify-content: space-between;
 }
+
+.pocketMembersDialog .pocketDetailHeader {
+  align-items: flex-start;
+}
+
+.pocketDetailHeader h2 {
+  margin-bottom: 9px;
+}
+
+.pocketDetailSummary {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pocketDetailSummary > span:not(.pocketLevelWrap):not(.statusBadge) {
+  background: #fffaf0;
+  border: 1px solid #f0dfc2;
+  border-radius: 999px;
+  color: #8b7355;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 6px 8px;
+}
+
+.pocketDetailTabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.pocketDetailContent {
+  align-content: start;
+  display: grid;
+  gap: 18px;
+  min-height: 330px;
+  padding: 22px;
+}
+
+.pocketDetailSectionHeading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.pocketDetailSectionHeading h3 {
+  font-size: 16px;
+  margin: 2px 0 0;
+}
+
+.pocketDetailSectionHeading > span {
+  background: #fff3c4;
+  border-radius: 999px;
+  color: #805b10;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 7px 9px;
+}
+
+.pocketInfoGrid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.pocketInfoGrid > div {
+  background: #fffaf0;
+  border: 1px solid #f0dfc2;
+  border-radius: 10px;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 13px 14px;
+}
+
+.pocketInfoGrid > div.wide { grid-column: 1 / -1; }
+.pocketInfoGrid dt { color: #8b7355; font-size: 11px; font-weight: 800; }
+.pocketInfoGrid dd { color: #5a371c; margin: 0; min-width: 0; }
+.pocketInfoGrid dd > strong { font-size: 13px; }
+.pocketInfoValueWithAction { align-items: center; display: flex; gap: 10px; justify-content: space-between; }
+.pocketInfoValueWithAction strong { min-width: 0; overflow-wrap: anywhere; }
+.pocketInfoValueWithAction button { align-items: center; background: #fff; border: 1px solid #ead7b7; border-radius: 8px; color: #8b7355; display: inline-flex; flex: 0 0 auto; height: 30px; justify-content: center; width: 30px; }
+.pocketInfoValueWithAction button:focus-visible { outline: 3px solid rgba(246, 200, 76, .35); outline-offset: 1px; }
+
+.pocketDetailContent.pocketMembersContent {
+  color: #76583a;
+  padding: 22px;
+}
+
+.pocketDetailEmpty {
+  color: #9b8061;
+  font-size: 12px;
+  margin: 0;
+  padding: 12px 0;
+}
+
+.pocketModerationMetrics {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.pocketModerationMetrics > div {
+  background: #fffaf0;
+  border: 1px solid #f0dfc2;
+  border-radius: 11px;
+  display: grid;
+  gap: 5px;
+  padding: 13px;
+}
+
+.pocketModerationMetrics span { color: #8b7355; font-size: 11px; font-weight: 800; }
+.pocketModerationMetrics strong { color: #5a371c; font-size: 17px; }
+
+.pocketManagementStatus {
+  align-items: center;
+  background: #eaf8f5;
+  border: 1px solid #b9e7dc;
+  border-radius: 12px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 14px;
+}
+
+.pocketManagementStatus.pendingDeletion { background: #fff1f3; border-color: #f3bac6; }
+.pocketManagementStatus > div { display: grid; gap: 4px; }
+.pocketManagementStatus > div > span { color: #8b7355; font-size: 11px; font-weight: 800; }
+.pocketManagementStatus > div > strong { color: #5a371c; font-size: 14px; }
+.pocketManagementStatus p { color: #8b7355; font-size: 11px; margin: 0; }
+
+.pocketReportSection { border-top: 1px solid #f0dfc2; display: grid; gap: 12px; padding-top: 18px; }
+.pocketReportTypeList { display: flex; flex-wrap: wrap; gap: 7px; }
+.pocketReportTypeList > span { background: #ffe8ed; border: 1px solid #f3bac6; border-radius: 999px; color: #a34a5e; font-size: 11px; font-weight: 900; padding: 7px 9px; }
+.pocketReportHistory { display: grid; gap: 8px; }
+.pocketReportHistory article { background: #fffaf0; border: 1px solid #f0dfc2; border-radius: 10px; display: grid; gap: 6px; padding: 12px 13px; }
+.pocketReportHistory article > div { align-items: center; display: flex; gap: 7px; }
+.pocketReportHistory article > div > span:last-child { color: #8b7355; font-size: 11px; font-weight: 800; }
+.pocketReportHistory article > strong { color: #5a371c; font-size: 13px; }
+.pocketReportHistory article > p { color: #8b7355; font-size: 12px; margin: 0; }
+.pocketReportHistory article > time { color: #9b8061; font-size: 10px; }
 
 .pocketMembersClose {
   background: #fffdf7;
@@ -2519,16 +2737,23 @@ tbody tr {
 }
 
 .pocketMemberItem strong,
-.pocketMemberItem span,
 .pocketMemberItem small {
   display: block;
 }
 
-.pocketMemberItem span,
 .pocketMemberItem small {
   color: #8b7355;
   font-size: 12px;
   margin-top: 3px;
+}
+
+.pocketMemberItem > .userAvatarFallback {
+  color: #6f4708;
+  display: flex;
+  flex: 0 0 34px;
+  font-size: 13px;
+  line-height: 1;
+  margin: 0;
 }
 
 .pocketMembersError {
@@ -4008,6 +4233,7 @@ tbody tr {
 .databaseRestoreNotice strong {
   font-size: 13px;
   font-weight: 900;
+  line-height: 20px;
 }
 
 .databaseRestoreNotice p {
@@ -4019,9 +4245,10 @@ tbody tr {
 .databaseRestoreNotice small,
 .databaseRestoreNotice em {
   color: #8b7355;
-  font-size: 12px;
+  font-family: inherit;
+  font-size: 13px;
   font-style: normal;
-  line-height: 18px;
+  line-height: 20px;
 }
 
 .databaseRestoreNotice em {
@@ -4694,6 +4921,142 @@ tbody tr {
     width: 100%;
   }
 
+  .pocketMobileSort {
+    align-items: center;
+    border-bottom: 1px solid #f0dfc2;
+    display: flex;
+    gap: 6px;
+    padding: 0 14px 12px;
+  }
+
+  .pocketMobileSort > span {
+    color: #9b8061;
+    font-size: 11px;
+    font-weight: 800;
+    margin-right: 2px;
+  }
+
+  .pocketMobileSort button {
+    align-items: center;
+    background: #fff;
+    border: 1px solid #ead7b7;
+    border-radius: 999px;
+    color: #8b7355;
+    display: inline-flex;
+    font-size: 11px;
+    font-weight: 800;
+    gap: 4px;
+    min-height: 30px;
+    padding: 0 9px;
+  }
+
+  .pocketMobileSort button.active {
+    background: #fff3c4;
+    border-color: #f0d48a;
+    color: #6f4525;
+  }
+
+  .pocketTableWrap {
+    overflow: visible;
+    padding: 2px 14px 14px;
+  }
+
+  .pocketStatusTable {
+    display: block;
+    min-width: 0 !important;
+  }
+
+  .pocketStatusTable thead {
+    display: none;
+  }
+
+  .pocketStatusTable tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .pocketStatusTable .pocketMemberRow {
+    background: #fff;
+    border: 1px solid #f0dfc2;
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(90, 55, 28, .05);
+    display: grid;
+    gap: 11px 8px;
+    grid-template-areas:
+      "name status"
+      "members records";
+    grid-template-columns: minmax(0, 1fr) auto;
+    height: auto;
+    padding: 13px 38px 13px 13px;
+    position: relative;
+  }
+
+  .pocketStatusTable .pocketMemberRow > td {
+    background: transparent;
+    border: 0;
+    display: block;
+    height: auto;
+    padding: 0;
+  }
+
+  .pocketStatusTable .pocketMemberRow > td:first-child {
+    grid-area: name;
+    min-width: 0;
+  }
+
+  .pocketStatusTable .pocketStatusCell {
+    grid-area: status;
+  }
+
+  .pocketStatusTable .pocketMetricCell:nth-child(3) {
+    grid-area: members;
+  }
+
+  .pocketStatusTable .pocketMetricCell:nth-child(4) {
+    grid-area: records;
+  }
+
+  .pocketStatusTable .pocketMetricCell {
+    align-items: center;
+    background: #fffaf0 !important;
+    border-radius: 8px;
+    display: flex !important;
+    gap: 12px;
+    justify-content: space-between;
+    min-width: 105px;
+    padding: 9px 10px !important;
+  }
+
+  .pocketStatusTable .pocketMetricCell::before {
+    color: #9b8061;
+    content: attr(data-label);
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  .pocketStatusTable .pocketRowAction {
+    align-items: center;
+    bottom: 0;
+    display: flex !important;
+    position: absolute;
+    right: 11px;
+    top: 0;
+  }
+
+  .pocketStatusTable .emptyTableCell {
+    border: 0;
+    display: block;
+    padding: 28px 12px;
+  }
+
+  .pocketStatusTable .pocketMemberRow:focus-visible {
+    box-shadow: 0 0 0 3px rgba(246, 200, 76, .28);
+  }
+
+  .pocketStatusTable .pocketMemberRow:focus-visible td:first-child {
+    box-shadow: none;
+  }
+
   .tableWrap {
     max-width: 100%;
     -webkit-overflow-scrolling: touch;
@@ -4705,18 +5068,11 @@ tbody tr {
   }
 
   .pagination {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .pagination div {
-    justify-content: space-between;
-    width: 100%;
+    justify-content: flex-start;
   }
 
   .pagination button {
-    min-width: 76px;
+    flex: 0 0 32px;
   }
 
   .supportQueuePanel,
@@ -4775,9 +5131,57 @@ tbody tr {
 
   .pocketMembersDialog,
   .pocketMembersDialog.userDetailDialog,
-  .pocketMembersDialog.moderationDialog {
+  .pocketMembersDialog.moderationDialog,
+  .pocketMembersDialog.pocketDetailDialog {
     max-height: calc(100dvh - 28px);
     width: 100%;
+  }
+
+  .pocketDetailHeader {
+    gap: 12px;
+  }
+
+  .pocketDetailHeader h2 {
+    font-size: 19px;
+  }
+
+  .pocketDetailContent,
+  .pocketDetailContent.pocketMembersContent {
+    min-height: 0;
+    padding: 18px 14px;
+  }
+
+  .pocketInfoGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pocketInfoGrid > div.wide {
+    grid-column: auto;
+  }
+
+  .pocketModerationMetrics {
+    gap: 7px;
+  }
+
+  .pocketModerationMetrics > div {
+    padding: 11px 9px;
+  }
+
+  .pocketModerationMetrics strong {
+    font-size: 15px;
+  }
+
+  .pocketManagementStatus {
+    align-items: flex-start;
+  }
+
+  .pocketMemberItem {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .pocketMemberItem > small:last-child {
+    grid-column: 2;
+    margin-top: -5px;
   }
 
   .userDetailTabs {
@@ -4801,5 +5205,36 @@ tbody tr {
 
   .userInfoGrid > div.wide {
     grid-column: auto;
+  }
+
+  .suspensionControlPanel {
+    padding: 14px;
+  }
+
+  .suspensionPresets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .suspensionInlineCustom {
+    grid-column: 1 / -1;
+  }
+
+  .suspensionActionBar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .suspensionApply {
+    width: 100%;
+  }
+
+  .suspensionStatusBanner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .suspensionLift {
+    width: 100%;
   }
 }

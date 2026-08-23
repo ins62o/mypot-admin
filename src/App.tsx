@@ -1,7 +1,15 @@
 ﻿import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import {
+  keepPreviousData,
+  queryOptions,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import {
   Check,
   ChevronDown,
+  ChevronRight,
+  Copy,
   Database,
   FileText,
   Inbox,
@@ -45,8 +53,15 @@ import {
 import './styles.css';
 
 const PAGE_SIZE = 10;
+const USER_PAGE_STALE_TIME = 60_000;
+const POCKET_MEMBERS_STALE_TIME = 5 * 60_000;
 const REPORT_REASON_LABELS: Record<string, string> = {
   abuse: '괴롭힘 또는 욕설', harassment: '괴롭힘 또는 욕설', hate: '혐오 표현', inappropriate: '부적절한 콘텐츠', other: '기타', sexual: '성적인 콘텐츠', spam: '스팸 또는 광고', violence: '폭력 또는 위협',
+};
+const REPORT_TARGET_TYPE_LABELS: Record<ContentReport['targetType'], string> = {
+  chatMessage: '채팅',
+  feed: '피드',
+  user: '사용자',
 };
 const DATABASE_ENVIRONMENT_STORAGE_KEY = 'mypot-admin-database-environment';
 const ADMIN_LOGIN_ALIAS = 'mypot';
@@ -66,15 +81,33 @@ const adminDateTimeFormatter = new Intl.DateTimeFormat('ko-KR', {
   timeZone: 'Asia/Seoul',
   year: 'numeric',
 });
+const compactAdminDateFormatter = new Intl.DateTimeFormat('ko-KR', {
+  day: '2-digit',
+  month: '2-digit',
+  timeZone: 'Asia/Seoul',
+  year: 'numeric',
+});
 
 type AdminPage = 'dashboard' | 'database' | 'moderation' | 'updates' | 'versions' | 'support';
 type DataSourceStatus = 'firebase' | 'loading' | 'error';
-type UserDetailTab = 'device' | 'moderation' | 'profile';
+type UserDetailTab = 'moderation' | 'profile';
+type PocketDetailTab = 'members' | 'moderation' | 'overview';
+type UserStatusFilter = 'active' | 'all' | 'suspended';
+type UserSortKey = 'lastLogin' | 'participation';
+type PocketSortKey = 'members' | 'records';
+type AdminUserQueryParams = {
+  page: number;
+  pageSize: number;
+  query: string;
+  sortBy: UserSortKey;
+  sortDirection: 'asc' | 'desc';
+  status: UserStatusFilter;
+};
 type EvidenceContentItem = { key: string; value: ReactNode };
 type EvidenceRow = { key: string; label: string; value: ReactNode };
 
 const statusLabel = {
-  active: '운영중',
+  active: '운영 중',
   answered: '답변 완료',
   draft: '작성중',
   pendingDeletion: '삭제 대기',
@@ -90,6 +123,32 @@ const pageTitle: Record<AdminPage, string> = {
   updates: '앱 공지 관리',
   versions: '버전 노트',
 };
+
+function adminUsersQueryOptions(
+  environment: DatabaseEnvironment,
+  params: AdminUserQueryParams,
+) {
+  return queryOptions({
+    queryFn: () => loadAdminUsers(environment, params),
+    queryKey: ['admin-users', environment, params] as const,
+    staleTime: USER_PAGE_STALE_TIME,
+  });
+}
+
+function pocketMembersQueryOptions(
+  environment: DatabaseEnvironment,
+  pocketId: string,
+  loadPocketMembers: (
+    pocketId: string,
+    environment: DatabaseEnvironment,
+  ) => Promise<AdminPocketMember[]>,
+) {
+  return queryOptions({
+    queryFn: () => loadPocketMembers(pocketId, environment),
+    queryKey: ['admin-pocket-members', environment, pocketId] as const,
+    staleTime: POCKET_MEMBERS_STALE_TIME,
+  });
+}
 
 const evidenceFieldLabels: Record<string, string> = {
   authorDisplayName: '작성자',
@@ -309,6 +368,40 @@ function formatAdminDateTime(value: number | string | null) {
   if (value === null || value === '') return '-';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '-' : adminDateTimeFormatter.format(date);
+}
+
+function formatCompactAdminDate(date: Date) {
+  const parts = compactAdminDateFormatter.formatToParts(date);
+  const getPart = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? '';
+
+  return `${getPart('year')}.${getPart('month')}.${getPart('day')}`;
+}
+
+function formatRelativeAdminTime(
+  value: number | string | null,
+  now: number,
+) {
+  if (value === null || value === '') return '-';
+
+  const date = new Date(value);
+  const timestamp = date.getTime();
+  if (Number.isNaN(timestamp)) return '-';
+
+  const elapsedMilliseconds = now - timestamp;
+  if (elapsedMilliseconds < -60_000) return '-';
+  if (elapsedMilliseconds < 60_000) return '방금 전';
+
+  const elapsedMinutes = Math.floor(elapsedMilliseconds / 60_000);
+  if (elapsedMinutes < 60) return `${elapsedMinutes}분 전`;
+
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  if (elapsedHours < 24) return `${elapsedHours}시간 전`;
+
+  const elapsedDays = Math.floor(elapsedHours / 24);
+  if (elapsedDays < 30) return `${elapsedDays}일 전`;
+
+  return formatCompactAdminDate(date);
 }
 
 function isUrl(value: string) {
@@ -953,6 +1046,7 @@ function EvidenceSummary({ createdAt, evidence }: { createdAt?: string; evidence
 }
 
 function App() {
+  const queryClient = useQueryClient();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [loginId, setLoginId] = useState('');
@@ -960,8 +1054,6 @@ function App() {
   const [loginError, setLoginError] = useState('');
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const [page, setPage] = useState<AdminPage>('dashboard');
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [userTotalCount, setUserTotalCount] = useState(0);
   const [registeredUserCount, setRegisteredUserCount] = useState(0);
   const [pockets, setPockets] = useState<AdminPocket[]>([]);
   const [versionNotes, setVersionNotes] = useState<VersionNote[]>(() =>
@@ -1018,10 +1110,11 @@ function App() {
       setIsAuthenticated(Boolean(user));
       if (!user) {
         setLoadedDashboardEnvironment(null);
+        queryClient.clear();
       }
       setIsCheckingSession(false);
     });
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     if (!isAuthenticated || !isFirebaseConfigured) {
@@ -1032,12 +1125,14 @@ function App() {
     const environmentLabel = databaseEnvironment === 'production' ? '운영' : '개발';
     setDataSourceStatus('loading');
     setFirebaseStatusMessage(`${environmentLabel} Firebase 데이터 불러오는 중`);
-    const usersRequest = loadAdminUsers(databaseEnvironment, {
+    const usersRequest = queryClient.fetchQuery(adminUsersQueryOptions(databaseEnvironment, {
       page: 1,
       pageSize: PAGE_SIZE,
       query: '',
+      sortBy: 'lastLogin',
+      sortDirection: 'desc',
       status: 'all',
-    });
+    }));
     const pocketsRequest = loadAdminPockets(databaseEnvironment);
 
     Promise.allSettled([usersRequest, pocketsRequest]).then(
@@ -1047,11 +1142,9 @@ function App() {
         }
 
         if (loadedUsers.status === 'fulfilled') {
-          setUsers(loadedUsers.value.users);
-          setUserTotalCount(loadedUsers.value.totalCount);
           setRegisteredUserCount(loadedUsers.value.totalCount);
         } else {
-          setUsers([]);
+          setRegisteredUserCount(0);
         }
 
         if (loadedPockets.status === 'fulfilled') {
@@ -1077,8 +1170,6 @@ function App() {
       }
 
       if (loadedUsers.status === 'fulfilled') {
-        setUsers(loadedUsers.value.users);
-        setUserTotalCount(loadedUsers.value.totalCount);
         setRegisteredUserCount(loadedUsers.value.totalCount);
       }
       if (loadedPockets.status === 'fulfilled') {
@@ -1108,7 +1199,6 @@ function App() {
       if (loadedReports.status === 'fulfilled') setContentReports(loadedReports.value);
 
       if (loadedUsers.status === 'rejected' || loadedPockets.status === 'rejected') {
-        setUsers([]);
         setPockets([]);
         setDataSourceStatus('error');
         setFirebaseStatusMessage(`${environmentLabel} Firebase 데이터 호출 실패`);
@@ -1128,7 +1218,7 @@ function App() {
     return () => {
       isMounted = false;
     };
-  }, [databaseEnvironment, isAuthenticated]);
+  }, [databaseEnvironment, isAuthenticated, queryClient]);
 
   function handleDatabaseEnvironmentChange(environment: DatabaseEnvironment) {
     setDatabaseEnvironment(environment);
@@ -1374,12 +1464,6 @@ function App() {
             environment={databaseEnvironment}
             firebaseStatusMessage={firebaseStatusMessage}
             onLoadPocketMembers={loadAdminPocketMembers}
-            onLoadUsers={async options => {
-              const result = await loadAdminUsers(databaseEnvironment, options);
-              setUsers(result.users);
-              setUserTotalCount(result.totalCount);
-              return result;
-            }}
             pendingDeletionPocketCount={pendingDeletionPocketCount}
             pockets={pockets}
             pocketWeeklyDelta={dashboardMetrics.pocketWeeklyDelta}
@@ -1387,16 +1471,8 @@ function App() {
             reports={contentReports}
             onSetUserSuspension={async (userId, options) => {
               await setAdminUserSuspension(userId, options, databaseEnvironment);
-              setUsers(current => current.map(user => user.id === userId ? {
-                ...user,
-                status: options.lift ? 'active' : 'suspended',
-                suspensionPermanent: options.permanent === true,
-                suspendedUntil: options.lift || options.permanent ? null : new Date(Date.now() + (options.durationDays ?? 0) * 86_400_000).toISOString(),
-              } : user));
             }}
             userWeeklyDelta={dashboardMetrics.userWeeklyDelta}
-            users={users}
-            userTotalCount={userTotalCount}
             registeredUserCount={registeredUserCount}
           />
         ) : null}
@@ -1480,7 +1556,6 @@ type DashboardPageProps = {
     pocketId: string,
     environment: DatabaseEnvironment,
   ) => Promise<AdminPocketMember[]>;
-  onLoadUsers: (options: { page: number; pageSize: number; query: string; status: 'active' | 'all' | 'suspended' }) => Promise<AdminUserPage>;
   pendingDeletionPocketCount: number;
   pockets: AdminPocket[];
   pocketWeeklyDelta: number;
@@ -1488,8 +1563,6 @@ type DashboardPageProps = {
   reports: ContentReport[];
   onSetUserSuspension: (userId: string, options: { durationDays?: number; lift?: boolean; permanent?: boolean }) => Promise<void>;
   userWeeklyDelta: number;
-  users: AdminUser[];
-  userTotalCount: number;
   registeredUserCount: number;
 };
 
@@ -1557,7 +1630,6 @@ function DashboardPage({
   environment,
   firebaseStatusMessage,
   onLoadPocketMembers,
-  onLoadUsers,
   pendingDeletionPocketCount,
   pockets,
   pocketWeeklyDelta,
@@ -1565,28 +1637,51 @@ function DashboardPage({
   reports,
   onSetUserSuspension,
   userWeeklyDelta,
-  users,
-  userTotalCount,
   registeredUserCount,
 }: DashboardPageProps) {
+  const queryClient = useQueryClient();
   const [userQuery, setUserQuery] = useState('');
-  const [userStatusFilter, setUserStatusFilter] = useState<'active' | 'all' | 'suspended'>('all');
+  const [debouncedUserQuery, setDebouncedUserQuery] = useState('');
+  const [userStatusFilter, setUserStatusFilter] = useState<UserStatusFilter>('all');
+  const [userSort, setUserSort] = useState<{
+    direction: 'asc' | 'desc';
+    key: UserSortKey;
+  }>({ direction: 'desc', key: 'lastLogin' });
   const [userPage, setUserPage] = useState(1);
+  const [relativeTimeNow, setRelativeTimeNow] = useState(() => Date.now());
   const [pocketQuery, setPocketQuery] = useState('');
   const [pocketStatusFilter, setPocketStatusFilter] =
     useState<'active' | 'all' | 'pendingDeletion'>('all');
+  const [pocketSort, setPocketSort] = useState<{
+    direction: 'asc' | 'desc';
+    key: PocketSortKey;
+  }>({ direction: 'desc', key: 'members' });
   const [pocketPage, setPocketPage] = useState(1);
   const [selectedPocket, setSelectedPocket] = useState<AdminPocket | null>(null);
+  const [pocketDetailTab, setPocketDetailTab] = useState<PocketDetailTab>('overview');
+  const [copiedPocketId, setCopiedPocketId] = useState(false);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [copiedUserField, setCopiedUserField] = useState<'email' | 'id' | null>(null);
   const [userDetailTab, setUserDetailTab] = useState<UserDetailTab>('profile');
   const [suspensionDays, setSuspensionDays] = useState('');
   const [suspensionPreset, setSuspensionPreset] = useState<3 | 7 | 30 | 'permanent' | null>(null);
   const [suspensionBusy, setSuspensionBusy] = useState(false);
   const [suspensionError, setSuspensionError] = useState('');
   const [pendingSuspension, setPendingSuspension] = useState<{ durationDays?: number; permanent?: boolean } | null>(null);
-  const [pocketMembers, setPocketMembers] = useState<AdminPocketMember[]>([]);
-  const [isLoadingPocketMembers, setIsLoadingPocketMembers] = useState(false);
-  const [pocketMembersError, setPocketMembersError] = useState('');
+
+  const userPageQuery = useQuery({
+    ...adminUsersQueryOptions(environment, {
+      page: userPage,
+      pageSize: PAGE_SIZE,
+      query: debouncedUserQuery,
+      sortBy: userSort.key,
+      sortDirection: userSort.direction,
+      status: userStatusFilter,
+    }),
+    placeholderData: keepPreviousData,
+  });
+  const users = userPageQuery.data?.users ?? [];
+  const userTotalCount = userPageQuery.data?.totalCount ?? 0;
 
   const sortedPockets = useMemo(() => {
     const normalizedQuery = pocketQuery.trim().toLocaleLowerCase('ko-KR');
@@ -1599,43 +1694,117 @@ function DashboardPage({
       return matchesQuery && matchesStatus;
     });
 
-    return [...filteredPockets].sort(
-      (left, right) =>
-        right.memberCount - left.memberCount ||
-        right.recordCount - left.recordCount,
-    );
-  }, [pocketQuery, pocketStatusFilter, pockets]);
+    return [...filteredPockets].sort((left, right) => {
+      const leftValue = pocketSort.key === 'members' ? left.memberCount : left.recordCount;
+      const rightValue = pocketSort.key === 'members' ? right.memberCount : right.recordCount;
+      const result = leftValue - rightValue;
+      return pocketSort.direction === 'asc' ? result : -result;
+    });
+  }, [pocketQuery, pocketSort, pocketStatusFilter, pockets]);
+
+  function updatePocketSort(key: PocketSortKey) {
+    setPocketSort((current) => ({
+      direction: current.key === key && current.direction === 'desc' ? 'asc' : 'desc',
+      key,
+    }));
+    setPocketPage(1);
+  }
 
   const userPageCount = Math.max(1, Math.ceil(userTotalCount / PAGE_SIZE));
   const pocketPageCount = Math.max(1, Math.ceil(sortedPockets.length / PAGE_SIZE));
-  const visibleUsers = useMemo(
-    () => [...users].sort((left, right) => {
-      const leftTimestamp = left.lastLoginAtTimestamp ?? 0;
-      const rightTimestamp = right.lastLoginAtTimestamp ?? 0;
-      return rightTimestamp - leftTimestamp;
-    }),
-    [users],
+  const visibleUsers = useMemo(() => [...users].sort((left, right) => {
+    let result = 0;
+    if (userSort.key === 'participation') {
+      result = left.pocketCount - right.pocketCount;
+    } else {
+      const leftTimestamp = left.lastLoginAtTimestamp;
+      const rightTimestamp = right.lastLoginAtTimestamp;
+      if (leftTimestamp === null && rightTimestamp === null) {
+        result = 0;
+      } else if (leftTimestamp === null) {
+        return 1;
+      } else if (rightTimestamp === null) {
+        return -1;
+      } else {
+        result = leftTimestamp - rightTimestamp;
+      }
+    }
+
+    if (result === 0) {
+      return left.displayName.localeCompare(right.displayName, 'ko-KR');
+    }
+    return userSort.direction === 'asc' ? result : -result;
+  }), [userSort, users]);
+  const visiblePockets = useMemo(
+    () => paginate(sortedPockets, pocketPage),
+    [pocketPage, sortedPockets],
   );
-  const visiblePockets = paginate(sortedPockets, pocketPage);
+  const selectedPocketMembersQuery = useQuery({
+    ...pocketMembersQueryOptions(
+      environment,
+      selectedPocket?.id ?? '',
+      onLoadPocketMembers,
+    ),
+    enabled: Boolean(selectedPocket),
+  });
+  const pocketMembers = selectedPocketMembersQuery.data ?? [];
+  const isLoadingPocketMembers = selectedPocketMembersQuery.isPending;
+  const pocketMembersError = selectedPocketMembersQuery.isError
+    ? '참여자 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
+    : '';
   const selectedUserReports = selectedUser
     ? reports.filter(report => report.status === 'resolved' && [report.targetUid, report.targetId, report.evidence.authorUid].includes(selectedUser.id))
     : [];
-  const hasSelectedUserDeviceInfo = Boolean(
-    selectedUser && [
-      selectedUser.appBuildNumber,
-      selectedUser.appVersion,
-      selectedUser.deviceModel,
-      selectedUser.osName,
-      selectedUser.osVersion,
-    ].some(Boolean),
+  const selectedUserReportTypes = Array.from(new Set(
+    selectedUserReports.map(
+      (report) => REPORT_REASON_LABELS[report.reason] ?? report.reason,
+    ),
+  ));
+  const selectedPocketReports = selectedPocket
+    ? reports
+      .filter((report) => report.pocketId === selectedPocket.id)
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    : [];
+  const selectedPocketReportTypes = Array.from(new Set(
+    selectedPocketReports.map(
+      (report) => REPORT_REASON_LABELS[report.reason] ?? report.reason,
+    ),
+  ));
+  const customSuspensionDays = Number(suspensionDays);
+  const hasValidCustomSuspensionDays = Boolean(
+    suspensionDays && customSuspensionDays >= 1 && customSuspensionDays <= 3650,
   );
-
+  const hasInvalidCustomSuspensionDays = Boolean(
+    suspensionDays && !hasValidCustomSuspensionDays,
+  );
+  const selectedSuspensionLabel = suspensionPreset === 'permanent'
+    ? '영구 정지'
+    : typeof suspensionPreset === 'number'
+      ? `${suspensionPreset}일 정지`
+      : hasValidCustomSuspensionDays
+        ? `${customSuspensionDays}일 정지`
+        : '기간을 선택해 주세요';
+  const canApplySuspension = !suspensionBusy && (
+    suspensionPreset !== null || hasValidCustomSuspensionDays
+  );
   async function updateSuspension(options: { durationDays?: number; lift?: boolean; permanent?: boolean }) {
     if (!selectedUser) return;
     setSuspensionBusy(true);
     setSuspensionError('');
     try {
       await onSetUserSuspension(selectedUser.id, options);
+      queryClient.setQueriesData<AdminUserPage>(
+        { queryKey: ['admin-users', environment] },
+        (currentPage) => currentPage ? {
+          ...currentPage,
+          users: currentPage.users.map((user) => user.id === selectedUser.id ? {
+            ...user,
+            status: options.lift ? 'active' : 'suspended',
+            suspensionPermanent: options.permanent === true,
+            suspendedUntil: options.lift || options.permanent ? null : new Date(Date.now() + (options.durationDays ?? 0) * 86_400_000).toISOString(),
+          } : user),
+        } : currentPage,
+      );
       setSelectedUser(current => current ? {
         ...current,
         status: options.lift ? 'active' : 'suspended',
@@ -1658,29 +1827,137 @@ function DashboardPage({
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      void onLoadUsers({ page: userPage, pageSize: PAGE_SIZE, query: userQuery.trim(), status: userStatusFilter });
+      setDebouncedUserQuery(userQuery.trim());
     }, 250);
     return () => window.clearTimeout(timeout);
-  }, [userPage, userQuery, userStatusFilter]);
+  }, [userQuery]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setRelativeTimeNow(Date.now());
+    }, 60_000);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!copiedUserField) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setCopiedUserField(null);
+    }, 2_000);
+
+    return () => window.clearTimeout(timeout);
+  }, [copiedUserField]);
+
+  useEffect(() => {
+    if (!copiedPocketId) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setCopiedPocketId(false), 2_000);
+    return () => window.clearTimeout(timeout);
+  }, [copiedPocketId]);
+
+  useEffect(() => {
+    visiblePockets.forEach((pocketItem) => {
+      void queryClient.prefetchQuery(pocketMembersQueryOptions(
+        environment,
+        pocketItem.id,
+        onLoadPocketMembers,
+      ));
+    });
+  }, [environment, onLoadPocketMembers, queryClient, visiblePockets]);
+
+  useEffect(() => {
+    if (
+      !userPageQuery.data ||
+      userPageQuery.isPlaceholderData ||
+      userPage >= userPageCount
+    ) {
+      return;
+    }
+
+    void queryClient.prefetchQuery(adminUsersQueryOptions(environment, {
+      page: userPage + 1,
+      pageSize: PAGE_SIZE,
+      query: debouncedUserQuery,
+      sortBy: userSort.key,
+      sortDirection: userSort.direction,
+      status: userStatusFilter,
+    }));
+  }, [
+    debouncedUserQuery,
+    environment,
+    queryClient,
+    userPage,
+    userPageCount,
+    userPageQuery.isPlaceholderData,
+    userSort,
+    userStatusFilter,
+  ]);
+
+  function updateUserSort(key: UserSortKey) {
+    setUserSort((current) => ({
+      direction: current.key === key && current.direction === 'desc' ? 'asc' : 'desc',
+      key,
+    }));
+    setUserPage(1);
+  }
 
   function updatePocketQuery(value: string) {
     setPocketQuery(value);
     setPocketPage(1);
   }
 
-  async function openPocketMembers(pocket: AdminPocket) {
+  function openPocketMembers(pocket: AdminPocket) {
     setSelectedPocket(pocket);
-    setPocketMembers([]);
-    setPocketMembersError('');
-    setIsLoadingPocketMembers(true);
+    setPocketDetailTab('overview');
+    setCopiedPocketId(false);
+  }
+
+  async function copyPocketId() {
+    if (!selectedPocket) return;
 
     try {
-      setPocketMembers(await onLoadPocketMembers(pocket.id, environment));
+      await navigator.clipboard.writeText(selectedPocket.id);
+      setCopiedPocketId(true);
     } catch {
-      setPocketMembersError('참여자 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
-    } finally {
-      setIsLoadingPocketMembers(false);
+      setCopiedPocketId(false);
     }
+  }
+
+  async function copyUserField(field: 'email' | 'id', value: string) {
+    let didCopy = false;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        didCopy = true;
+      }
+    } catch {
+      // 보안 컨텍스트가 아닌 로컬 접속에서는 아래 대체 방식을 사용합니다.
+    }
+
+    if (!didCopy) {
+      const textarea = document.createElement('textarea');
+      try {
+        textarea.value = value;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        didCopy = document.execCommand('copy');
+      } catch {
+        didCopy = false;
+      } finally {
+        textarea.remove();
+      }
+    }
+
+    setCopiedUserField(didCopy ? field : null);
   }
 
   return (
@@ -1718,18 +1995,57 @@ function DashboardPage({
           </div>
 
           <div className="tableWrap compactTable dashboardTableWrap">
-            <table>
+            <table className="userStatusTable">
               <thead>
                 <tr>
                   <th>사용자</th>
                   <th>로그인</th>
-                  <th>참여</th>
-                  <th>최근 로그인</th>
+                  <th aria-sort={userSort.key === 'participation' ? (userSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button className="userSortButton" type="button" onClick={() => updateUserSort('participation')}>
+                      참여
+                      <ChevronDown
+                        className={userSort.key === 'participation'
+                          ? `active ${userSort.direction === 'asc' ? 'ascending' : ''}`
+                          : 'inactive'}
+                        size={14}
+                      />
+                    </button>
+                  </th>
+                  <th aria-sort={userSort.key === 'lastLogin' ? (userSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button className="userSortButton" type="button" onClick={() => updateUserSort('lastLogin')}>
+                      최근 로그인
+                      <ChevronDown
+                        className={userSort.key === 'lastLogin'
+                          ? `active ${userSort.direction === 'asc' ? 'ascending' : ''}`
+                          : 'inactive'}
+                        size={14}
+                      />
+                    </button>
+                  </th>
+                  <th><span className="srOnly">상세</span></th>
                 </tr>
               </thead>
               <tbody>
                 {visibleUsers.map((user) => (
-                  <tr className="userDetailRow" key={user.id} onClick={() => { setSelectedUser(user); setUserDetailTab('profile'); setSuspensionError(''); setSuspensionDays(''); setSuspensionPreset(null); }}>
+                  <tr
+                    aria-label={`${user.displayName} 사용자 상세 보기`}
+                    className="userDetailRow"
+                    key={user.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => { setSelectedUser(user); setCopiedUserField(null); setUserDetailTab('profile'); setSuspensionError(''); setSuspensionDays(''); setSuspensionPreset(null); }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setSelectedUser(user);
+                        setCopiedUserField(null);
+                        setUserDetailTab('profile');
+                        setSuspensionError('');
+                        setSuspensionDays('');
+                        setSuspensionPreset(null);
+                      }
+                    }}
+                  >
                     <td>
                       <div className="userCell">
                         <UserAvatarWithStatus
@@ -1746,12 +2062,21 @@ function DashboardPage({
                       <ProviderBadge provider={user.provider} />
                     </td>
                     <td>{user.pocketCount}개</td>
-                    <td>{formatAdminDate(user.lastLoginAtTimestamp ?? user.lastLoginAt)}</td>
+                    <td title={formatAdminDateTime(user.lastLoginAtTimestamp ?? user.lastLoginAt)}>
+                      {formatRelativeAdminTime(
+                        user.lastLoginAtTimestamp ?? user.lastLoginAt,
+                        relativeTimeNow,
+                      )}
+                    </td>
+                    <td className="userRowAction">
+                      <ChevronRight aria-hidden="true" size={18} />
+                      <span className="srOnly">상세 보기</span>
+                    </td>
                   </tr>
                 ))}
                 {visibleUsers.length === 0 ? (
                   <tr>
-                    <td className="emptyTableCell" colSpan={4}>
+                    <td className="emptyTableCell" colSpan={5}>
                       데이터 없음
                     </td>
                   </tr>
@@ -1801,13 +2126,49 @@ function DashboardPage({
             </div>
           </div>
 
-          <div className="tableWrap compactTable dashboardTableWrap">
-            <table>
+          <div className="pocketMobileSort" aria-label="주머니 목록 정렬">
+            <span>정렬</span>
+            {([['members', '구성원'], ['records', '활동 기록']] as const).map(([key, label]) => (
+              <button
+                className={pocketSort.key === key ? 'active' : ''}
+                key={key}
+                type="button"
+                onClick={() => updatePocketSort(key)}
+              >
+                {label}
+                <ChevronDown
+                  className={pocketSort.key === key && pocketSort.direction === 'asc' ? 'ascending' : ''}
+                  size={14}
+                />
+              </button>
+            ))}
+          </div>
+
+          <div className="tableWrap compactTable dashboardTableWrap pocketTableWrap">
+            <table className="pocketStatusTable">
               <thead>
                 <tr>
                   <th>주머니</th>
-                  <th>구성원</th>
-                  <th>기록</th>
+                  <th>상태</th>
+                  <th aria-sort={pocketSort.key === 'members' ? (pocketSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button className="pocketSortButton" type="button" onClick={() => updatePocketSort('members')}>
+                      구성원
+                      <ChevronDown
+                        className={pocketSort.key === 'members' && pocketSort.direction === 'asc' ? 'ascending' : ''}
+                        size={14}
+                      />
+                    </button>
+                  </th>
+                  <th aria-sort={pocketSort.key === 'records' ? (pocketSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button className="pocketSortButton" type="button" onClick={() => updatePocketSort('records')}>
+                      활동 기록
+                      <ChevronDown
+                        className={pocketSort.key === 'records' && pocketSort.direction === 'asc' ? 'ascending' : ''}
+                        size={14}
+                      />
+                    </button>
+                  </th>
+                  <th><span className="srOnly">상세</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -1828,20 +2189,22 @@ function DashboardPage({
                   >
                     <td>
                       <div className="pocketNameCell">
-                        <PocketLevelIndicator
-                          active={pocketItem.status === 'active'}
-                          level={pocketItem.level}
-                        />
+                        <PocketLevelIndicator level={pocketItem.level} />
                         <strong>{pocketItem.name}</strong>
                       </div>
                     </td>
-                    <td>{pocketItem.memberCount}명</td>
-                    <td>{pocketItem.recordCount}개</td>
+                    <td className="pocketStatusCell"><StatusBadge status={pocketItem.status} /></td>
+                    <td className="pocketMetricCell" data-label="구성원"><strong>{pocketItem.memberCount}명</strong></td>
+                    <td className="pocketMetricCell" data-label="활동 기록"><strong>{pocketItem.recordCount}개</strong></td>
+                    <td className="pocketRowAction">
+                      <ChevronRight aria-hidden="true" size={18} />
+                      <span className="srOnly">상세 보기</span>
+                    </td>
                   </tr>
                 ))}
                 {visiblePockets.length === 0 ? (
                   <tr>
-                    <td className="emptyTableCell" colSpan={3}>
+                    <td className="emptyTableCell" colSpan={5}>
                       데이터 없음
                     </td>
                   </tr>
@@ -1862,13 +2225,12 @@ function DashboardPage({
         <div className="pocketMembersBackdrop" role="presentation">
           <section aria-labelledby="user-detail-title" aria-modal="true" className="pocketMembersDialog userDetailDialog" role="dialog">
             <div className="panelHeader compact">
-              <div><p className="eyebrow">사용자 상세</p><h2 id="user-detail-title">{selectedUser.displayName}</h2></div>
+              <div><p className="eyebrow">사용자 관리</p><h2 id="user-detail-title">사용자 상세</h2></div>
               <button className="pocketMembersClose" onClick={() => setSelectedUser(null)} type="button">닫기</button>
             </div>
             <div aria-label="사용자 상세 메뉴" className="userDetailTabs" role="tablist">
               {([
                 ['profile', '사용자 정보'],
-                ['device', '앱 · 기기 정보'],
                 ['moderation', '정지 · 신고 관리'],
               ] as const).map(([value, label]) => (
                 <button
@@ -1901,46 +2263,45 @@ function DashboardPage({
                   />
                   <div>
                     <strong>{selectedUser.displayName}</strong>
-                    <small>{selectedUser.email || '이메일 없음'}</small>
                   </div>
                   <UserStatusBadge status={selectedUser.status} />
                 </div>
                 <dl className="userInfoGrid">
-                  <div><dt>사용자 ID</dt><dd><code>{selectedUser.id}</code></dd></div>
-                  <div><dt>이메일</dt><dd>{selectedUser.email || '-'}</dd></div>
+                  <div>
+                    <dt>사용자 ID</dt>
+                    <dd className="userInfoValueWithAction">
+                      <code>{selectedUser.id}</code>
+                      <button
+                        aria-label="사용자 ID 복사"
+                        title={copiedUserField === 'id' ? '복사됨' : '사용자 ID 복사'}
+                        type="button"
+                        onClick={() => void copyUserField('id', selectedUser.id)}
+                      >
+                        {copiedUserField === 'id' ? <Check aria-hidden="true" size={14} /> : <Copy aria-hidden="true" size={14} />}
+                      </button>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>이메일</dt>
+                    <dd className="userInfoValueWithAction">
+                      <span>{selectedUser.email || '-'}</span>
+                      {selectedUser.email ? (
+                        <button
+                          aria-label="이메일 복사"
+                          title={copiedUserField === 'email' ? '복사됨' : '이메일 복사'}
+                          type="button"
+                          onClick={() => void copyUserField('email', selectedUser.email)}
+                        >
+                          {copiedUserField === 'email' ? <Check aria-hidden="true" size={14} /> : <Copy aria-hidden="true" size={14} />}
+                        </button>
+                      ) : null}
+                    </dd>
+                  </div>
                   <div><dt>로그인 방식</dt><dd>{selectedUser.provider === 'Kakao' ? '카카오' : '애플'}</dd></div>
                   <div><dt>참여 주머니</dt><dd>{selectedUser.pocketCount.toLocaleString('ko-KR')}개</dd></div>
                   <div><dt>가입일</dt><dd>{formatAdminDate(selectedUser.joinedAt)}</dd></div>
                   <div><dt>최근 로그인</dt><dd>{formatAdminDateTime(selectedUser.lastLoginAtTimestamp ?? selectedUser.lastLoginAt)}</dd></div>
                 </dl>
-              </div>
-            ) : null}
-
-            {userDetailTab === 'device' ? (
-              <div
-                aria-labelledby="user-detail-tab-device"
-                className="userDetailContent userDevicePanel"
-                id="user-detail-panel-device"
-                role="tabpanel"
-              >
-                <div className="userDetailSectionTitle">
-                  <div><p className="eyebrow">설치 환경</p><h3>앱 및 기기 정보</h3></div>
-                </div>
-                {hasSelectedUserDeviceInfo ? (
-                  <dl className="userInfoGrid deviceInfoGrid">
-                    <div><dt>설치 버전</dt><dd>{selectedUser.appVersion || '-'}</dd></div>
-                    <div><dt>빌드 번호</dt><dd>{selectedUser.appBuildNumber || '-'}</dd></div>
-                    <div><dt>운영체제</dt><dd>{selectedUser.osName || '-'}</dd></div>
-                    <div><dt>OS 버전</dt><dd>{selectedUser.osVersion || '-'}</dd></div>
-                    <div className="wide"><dt>기기 모델</dt><dd>{selectedUser.deviceModel || '-'}</dd></div>
-                  </dl>
-                ) : (
-                  <div className="userDeviceEmpty">
-                    <Smartphone aria-hidden="true" size={22} />
-                    <strong>수집된 앱·기기 정보가 없습니다.</strong>
-                    <span>사용자가 앱에 다시 접속하면 정보가 표시될 수 있습니다.</span>
-                  </div>
-                )}
               </div>
             ) : null}
 
@@ -1952,18 +2313,122 @@ function DashboardPage({
                 role="tabpanel"
               >
                 <section className="userReportSection">
-                  <div className="userDetailSectionTitle"><h3>처리 신고</h3><ReportCountBadge count={selectedUserReports.length} /></div>
-                  {selectedUserReports.length ? <div className="userReportList">{selectedUserReports.map(report => (
-                    <div key={report.id}><strong>{report.targetType === 'feed' ? '피드' : report.targetType === 'chatMessage' ? '채팅' : '사용자'} · {REPORT_REASON_LABELS[report.reason] ?? report.reason}</strong><span>{report.resolvedAt ? new Date(report.resolvedAt).toLocaleString('ko-KR') : '-'}</span></div>
-                  ))}</div> : <p className="userDetailEmpty">처리 완료된 신고가 없습니다.</p>}
+                  <div className="userDetailSectionTitle"><h3>적용된 신고 유형</h3><ReportCountBadge count={selectedUserReports.length} /></div>
+                  {selectedUserReportTypes.length ? <div className="userReportList">{selectedUserReportTypes.map((reportType) => (
+                    <div key={reportType}><strong>{reportType}</strong></div>
+                  ))}</div> : <p className="userDetailEmpty">적용된 신고 유형이 없습니다.</p>}
                 </section>
                 <section className="userSuspensionSection">
-                  <div className="userDetailSectionTitle"><h3>계정 정지</h3></div>
-                  {selectedUser.status === 'suspended' ? <p className="suspensionCurrent">{selectedUser.suspensionPermanent ? '영구 정지 중' : `${selectedUser.suspendedUntil ? new Date(selectedUser.suspendedUntil).toLocaleString('ko-KR') : '-'}까지 정지`}</p> : <p className="suspensionHelp">기간을 선택하거나 직접 일수를 입력해 주세요.</p>}
-                  <div className="suspensionPresets">{([3, 7, 30] as const).map(days => <button className={suspensionPreset === days ? 'selected' : ''} disabled={suspensionBusy} key={days} onClick={() => { setSuspensionPreset(days); setSuspensionDays(''); }} type="button">{days}일</button>)}<button className={`danger ${suspensionPreset === 'permanent' ? 'selected' : ''}`} disabled={suspensionBusy} onClick={() => { setSuspensionPreset('permanent'); setSuspensionDays(''); }} type="button">영구</button></div>
-                  <div className="suspensionCustom"><label htmlFor="suspension-days">직접 입력</label><div><input id="suspension-days" inputMode="numeric" min="1" max="3650" onChange={event => { setSuspensionDays(event.target.value.replace(/\D/g, '')); setSuspensionPreset(null); }} placeholder="일수" type="text" value={suspensionDays} /><button disabled={suspensionBusy || (!suspensionPreset && (!suspensionDays || Number(suspensionDays) < 1 || Number(suspensionDays) > 3650))} onClick={() => setPendingSuspension(suspensionPreset === 'permanent' ? { permanent: true } : { durationDays: typeof suspensionPreset === 'number' ? suspensionPreset : Number(suspensionDays) })} type="button">정지 적용</button></div></div>
+                  <div className="userDetailSectionTitle suspensionSectionTitle">
+                    <div>
+                      <h3>계정 정지</h3>
+                      <p>사용자의 서비스 이용을 제한할 기간을 선택해 주세요.</p>
+                    </div>
+                  </div>
+
+                  {selectedUser.status === 'suspended' ? (
+                    <div className="suspensionStatusBanner">
+                      <div>
+                        <span>현재 상태</span>
+                        <strong>
+                          {selectedUser.suspensionPermanent
+                            ? '영구 정지 중'
+                            : `${selectedUser.suspendedUntil ? new Date(selectedUser.suspendedUntil).toLocaleString('ko-KR') : '-'}까지 정지`}
+                        </strong>
+                      </div>
+                      <button
+                        className="suspensionLift"
+                        disabled={suspensionBusy}
+                        type="button"
+                        onClick={() => updateSuspension({ lift: true })}
+                      >
+                        정지 해제
+                      </button>
+                    </div>
+                  ) : null}
+
+                  <div className="suspensionControlPanel">
+                    <fieldset className="suspensionPresetFieldset" disabled={suspensionBusy}>
+                      <legend>정지 기간</legend>
+                      <div className="suspensionPresets">
+                        {([3, 7, 30] as const).map((days) => (
+                          <button
+                            aria-pressed={suspensionPreset === days}
+                            className={suspensionPreset === days ? 'selected' : ''}
+                            key={days}
+                            type="button"
+                            onClick={() => {
+                              setSuspensionPreset(days);
+                              setSuspensionDays('');
+                            }}
+                          >
+                            {days}일
+                          </button>
+                        ))}
+                        <button
+                          aria-pressed={suspensionPreset === 'permanent'}
+                          className={`permanent ${suspensionPreset === 'permanent' ? 'selected' : ''}`}
+                          type="button"
+                          onClick={() => {
+                            setSuspensionPreset('permanent');
+                            setSuspensionDays('');
+                          }}
+                        >
+                          영구 정지
+                        </button>
+                        <label
+                          className={`suspensionInlineCustom ${suspensionDays ? 'selected' : ''} ${hasInvalidCustomSuspensionDays ? 'error' : ''}`}
+                          htmlFor="suspension-days"
+                        >
+                          <input
+                            aria-describedby="suspension-days-help"
+                            aria-invalid={hasInvalidCustomSuspensionDays}
+                            disabled={suspensionBusy}
+                            id="suspension-days"
+                            inputMode="numeric"
+                            maxLength={4}
+                            placeholder="직접 입력"
+                            type="text"
+                            value={suspensionDays}
+                            onChange={(event) => {
+                              setSuspensionDays(event.target.value.replace(/\D/g, ''));
+                              setSuspensionPreset(null);
+                            }}
+                          />
+                          <span aria-hidden="true">일</span>
+                        </label>
+                      </div>
+                      <small className={hasInvalidCustomSuspensionDays ? 'error' : ''} id="suspension-days-help">
+                        {hasInvalidCustomSuspensionDays
+                          ? '1일에서 3650일 사이로 입력해 주세요.'
+                          : '최대 3650일까지 입력할 수 있어요.'}
+                      </small>
+                    </fieldset>
+
+                    <div className="suspensionActionBar">
+                      <div aria-live="polite">
+                        <span>선택한 기간</span>
+                        <strong>{selectedSuspensionLabel}</strong>
+                      </div>
+                      <button
+                        className="suspensionApply"
+                        disabled={!canApplySuspension}
+                        type="button"
+                        onClick={() => setPendingSuspension(
+                          suspensionPreset === 'permanent'
+                            ? { permanent: true }
+                            : {
+                                durationDays: typeof suspensionPreset === 'number'
+                                  ? suspensionPreset
+                                  : customSuspensionDays,
+                              },
+                        )}
+                      >
+                        정지 적용
+                      </button>
+                    </div>
+                  </div>
                   {suspensionError ? <p className="moderationError">{suspensionError}</p> : null}
-                  {selectedUser.status === 'suspended' ? <button className="suspensionLift" disabled={suspensionBusy} onClick={() => updateSuspension({ lift: true })} type="button">정지 해제</button> : null}
                 </section>
               </div>
             ) : null}
@@ -1976,15 +2441,21 @@ function DashboardPage({
       {selectedPocket ? (
         <div className="pocketMembersBackdrop" role="presentation">
           <section
-            aria-labelledby="pocket-members-title"
+            aria-labelledby="pocket-detail-title"
             aria-modal="true"
-            className="pocketMembersDialog"
+            className="pocketMembersDialog pocketDetailDialog"
             role="dialog"
           >
-            <div className="panelHeader compact">
+            <div className="panelHeader compact pocketDetailHeader">
               <div>
-                <p className="eyebrow">참여자</p>
-                <h2 id="pocket-members-title">{selectedPocket.name} 참여자</h2>
+                <p className="eyebrow">주머니 관리</p>
+                <h2 id="pocket-detail-title">{selectedPocket.name}</h2>
+                <div className="pocketDetailSummary" aria-label="주머니 요약">
+                  <PocketLevelIndicator level={selectedPocket.level} />
+                  <StatusBadge status={selectedPocket.status} />
+                  <span>구성원 {selectedPocket.memberCount.toLocaleString('ko-KR')}명</span>
+                  <span>활동 기록 {selectedPocket.recordCount.toLocaleString('ko-KR')}개</span>
+                </div>
               </div>
               <button
                 className="pocketMembersClose"
@@ -1994,31 +2465,149 @@ function DashboardPage({
                 닫기
               </button>
             </div>
-            <div className="pocketMembersContent">
-              {isLoadingPocketMembers ? (
-                <div className="pocketMembersLoading">
-                  <div className="sessionLoader" aria-label="참여자 목록 불러오는 중" />
-                </div>
-              ) : null}
-              {pocketMembersError ? <p className="pocketMembersError">{pocketMembersError}</p> : null}
-              {!isLoadingPocketMembers && !pocketMembersError ? (
-                <div className="pocketMembersList">
-                  {pocketMembers.map((member) => (
-                    <div className="pocketMemberItem" key={member.id}>
-                      <UserAvatar
-                        displayName={member.displayName}
-                        photoURL={member.photoURL}
-                      />
-                      <div>
-                        <strong>{member.displayName}</strong>
-                      </div>
-                      <small>{member.joinedAt} 참여</small>
-                    </div>
-                  ))}
-                  {pocketMembers.length === 0 ? <p>참여자가 없어요.</p> : null}
-                </div>
-              ) : null}
+
+            <div className="userDetailTabs pocketDetailTabs" role="tablist" aria-label="주머니 상세 메뉴">
+              {([
+                ['overview', '주머니 정보'],
+                ['members', '구성원'],
+                ['moderation', '신고·관리'],
+              ] as const).map(([value, label]) => (
+                <button
+                  aria-controls={`pocket-detail-panel-${value}`}
+                  aria-selected={pocketDetailTab === value}
+                  className={pocketDetailTab === value ? 'active' : ''}
+                  id={`pocket-detail-tab-${value}`}
+                  key={value}
+                  role="tab"
+                  type="button"
+                  onClick={() => setPocketDetailTab(value)}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
+
+            {pocketDetailTab === 'overview' ? (
+              <div
+                aria-labelledby="pocket-detail-tab-overview"
+                className="pocketDetailContent"
+                id="pocket-detail-panel-overview"
+                role="tabpanel"
+              >
+                <div className="pocketDetailSectionHeading">
+                  <div><p className="eyebrow">기본 정보</p><h3>주머니 정보</h3></div>
+                </div>
+                <dl className="pocketInfoGrid">
+                  <div className="wide">
+                    <dt>주머니 ID</dt>
+                    <dd className="pocketInfoValueWithAction">
+                      <strong>{selectedPocket.id}</strong>
+                      <button aria-label="주머니 ID 복사" type="button" onClick={() => void copyPocketId()}>
+                        {copiedPocketId ? <Check aria-hidden="true" size={15} /> : <Copy aria-hidden="true" size={15} />}
+                      </button>
+                    </dd>
+                  </div>
+                  <div><dt>현재 상태</dt><dd><StatusBadge status={selectedPocket.status} /></dd></div>
+                  <div><dt>주머니 레벨</dt><dd><strong>Lv.{selectedPocket.level}</strong></dd></div>
+                  <div><dt>생성일</dt><dd><strong>{formatAdminDate(selectedPocket.createdAt)}</strong></dd></div>
+                  <div><dt>구성원</dt><dd><strong>{selectedPocket.memberCount.toLocaleString('ko-KR')}명</strong></dd></div>
+                  <div><dt>활동 기록</dt><dd><strong>{selectedPocket.recordCount.toLocaleString('ko-KR')}개</strong></dd></div>
+                  <div><dt>누적 신고</dt><dd><strong>{selectedPocketReports.length.toLocaleString('ko-KR')}건</strong></dd></div>
+                </dl>
+              </div>
+            ) : null}
+
+            {pocketDetailTab === 'members' ? (
+              <div
+                aria-labelledby="pocket-detail-tab-members"
+                className="pocketDetailContent pocketMembersContent"
+                id="pocket-detail-panel-members"
+                role="tabpanel"
+              >
+                <div className="pocketDetailSectionHeading">
+                  <div><p className="eyebrow">참여자</p><h3>구성원 목록</h3></div>
+                  <span>{pocketMembers.length.toLocaleString('ko-KR')}명</span>
+                </div>
+                {isLoadingPocketMembers ? (
+                  <div className="pocketMembersLoading">
+                    <div className="sessionLoader" aria-label="참여자 목록 불러오는 중" />
+                  </div>
+                ) : null}
+                {pocketMembersError ? <p className="pocketMembersError">{pocketMembersError}</p> : null}
+                {!isLoadingPocketMembers && !pocketMembersError ? (
+                  <div className="pocketMembersList">
+                    {pocketMembers.map((member) => (
+                      <div className="pocketMemberItem" key={member.id}>
+                        <UserAvatar displayName={member.displayName} photoURL={member.photoURL} />
+                        <div>
+                          <strong>{member.displayName}</strong>
+                        </div>
+                        <small>{member.joinedAt} 참여</small>
+                      </div>
+                    ))}
+                    {pocketMembers.length === 0 ? <p className="pocketDetailEmpty">참여자가 없어요.</p> : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {pocketDetailTab === 'moderation' ? (
+              <div
+                aria-labelledby="pocket-detail-tab-moderation"
+                className="pocketDetailContent pocketModerationContent"
+                id="pocket-detail-panel-moderation"
+                role="tabpanel"
+              >
+                <div className="pocketModerationMetrics">
+                  <div><span>누적 신고</span><strong>{selectedPocketReports.length.toLocaleString('ko-KR')}건</strong></div>
+                  <div><span>미처리</span><strong>{selectedPocketReports.filter((report) => report.status === 'open').length.toLocaleString('ko-KR')}건</strong></div>
+                  <div><span>처리 완료</span><strong>{selectedPocketReports.filter((report) => report.status !== 'open').length.toLocaleString('ko-KR')}건</strong></div>
+                </div>
+
+                <section className={`pocketManagementStatus ${selectedPocket.status}`}>
+                  <div>
+                    <span>관리 상태</span>
+                    <strong>{selectedPocket.status === 'active' ? '정상 운영 중' : '삭제 대기 중'}</strong>
+                    <p>{selectedPocket.status === 'active' ? '현재 별도의 제한 없이 운영되고 있습니다.' : '삭제 절차가 진행 중인 주머니입니다.'}</p>
+                  </div>
+                  <StatusBadge status={selectedPocket.status} />
+                </section>
+
+                <section className="pocketReportSection">
+                  <div className="pocketDetailSectionHeading">
+                    <div><p className="eyebrow">신고 유형</p><h3>접수된 유형</h3></div>
+                  </div>
+                  {selectedPocketReportTypes.length ? (
+                    <div className="pocketReportTypeList">
+                      {selectedPocketReportTypes.map((reportType) => <span key={reportType}>{reportType}</span>)}
+                    </div>
+                  ) : <p className="pocketDetailEmpty">접수된 신고가 없습니다.</p>}
+                </section>
+
+                {selectedPocketReports.length ? (
+                  <section className="pocketReportSection">
+                    <div className="pocketDetailSectionHeading">
+                      <div><p className="eyebrow">최근 신고</p><h3>신고 이력</h3></div>
+                    </div>
+                    <div className="pocketReportHistory">
+                      {selectedPocketReports.slice(0, 5).map((report) => (
+                        <article key={report.id}>
+                          <div>
+                            <span className={`reportStatus ${report.status}`}>
+                              {report.status === 'open' ? '미처리' : report.status === 'dismissed' ? '문제 없음' : '처리 완료'}
+                            </span>
+                            <span>{REPORT_TARGET_TYPE_LABELS[report.targetType]}</span>
+                          </div>
+                          <strong>{REPORT_REASON_LABELS[report.reason] ?? report.reason}</strong>
+                          <p>{report.targetName || '신고 대상 정보 없음'}</p>
+                          <time dateTime={report.createdAt}>{formatAdminDateTime(report.createdAt)}</time>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+              </div>
+            ) : null}
           </section>
         </div>
       ) : null}
@@ -2368,27 +2957,20 @@ function Pagination({
   }
 
   return (
-    <div className="pagination">
-      <span>
-        {currentPage} / {pageCount}
-      </span>
-      <div>
+    <nav aria-label="페이지 이동" className="pagination">
+      {Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => (
         <button
-          disabled={currentPage <= 1}
+          aria-current={page === currentPage ? 'page' : undefined}
+          aria-label={`${page}페이지`}
+          className={page === currentPage ? 'current' : ''}
+          key={page}
           type="button"
-          onClick={() => onChange(currentPage - 1)}
+          onClick={() => onChange(page)}
         >
-          이전
+          {page}
         </button>
-        <button
-          disabled={currentPage >= pageCount}
-          type="button"
-          onClick={() => onChange(currentPage + 1)}
-        >
-          다음
-        </button>
-      </div>
-    </div>
+      ))}
+    </nav>
   );
 }
 
@@ -3252,7 +3834,7 @@ function UserAvatar({ displayName, photoURL }: UserAvatarProps) {
 }
 
 function ReportCountBadge({ count }: { count: number }) {
-  return <span className={`reportCountBadge ${count > 0 ? 'hasReports' : ''}`}>{count.toLocaleString('ko-KR')}건</span>;
+  return <span className={`reportCountBadge ${count > 0 ? 'hasReports' : ''}`}>누적 건수 {count.toLocaleString('ko-KR')}건</span>;
 }
 
 function UserStatusBadge({ status }: { status: AdminUser['status'] }) {
@@ -3275,20 +3857,10 @@ function UserAvatarWithStatus({
   );
 }
 
-function PocketLevelIndicator({
-  active,
-  level,
-}: {
-  active: boolean;
-  level: number;
-}) {
-  const status = active ? '운영 중' : '삭제 대기';
-
+function PocketLevelIndicator({ level }: { level: number }) {
   return (
     <span className="pocketLevelWrap">
-      <span aria-hidden="true" className="pocketLevelValue">{level}</span>
-      <span aria-hidden="true" className={`pocketLevelStatus ${active ? 'active' : 'inactive'}`} />
-      <span className="srOnly">레벨 {level}, {status}</span>
+      Lv.{level}
     </span>
   );
 }

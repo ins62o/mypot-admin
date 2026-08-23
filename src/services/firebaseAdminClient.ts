@@ -36,24 +36,9 @@ type RawSupportInquiry = Omit<SupportInquiry, 'attachments' | 'status'> & {
   status?: string | null;
 };
 
-type NormalizedAdminUserFields =
-  | 'appBuildNumber'
-  | 'appVersion'
-  | 'deviceModel'
-  | 'lastLoginAtTimestamp'
-  | 'osName'
-  | 'osVersion';
+type NormalizedAdminUserFields = 'lastLoginAtTimestamp';
 type RawAdminUser = Omit<AdminUser, NormalizedAdminUserFields> & Record<string, unknown>;
 type RawAdminUserPage = Omit<AdminUserPage, 'users'> & { users: RawAdminUser[] };
-
-function getStringValue(...values: unknown[]) {
-  for (const value of values) {
-    if (typeof value === 'string' && value.trim()) return value.trim();
-    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
-  }
-
-  return null;
-}
 
 function getRecordValue(value: unknown) {
   return value && typeof value === 'object' ? value as Record<string, unknown> : null;
@@ -123,51 +108,6 @@ function getUserLastLoginTimestamp(user: RawAdminUser) {
   return null;
 }
 
-function getUserDeviceInfo(user: RawAdminUser) {
-  const appInfo = getRecordValue(user.appInfo) ?? getRecordValue(user.application);
-  const deviceInfo = getRecordValue(user.deviceInfo) ?? getRecordValue(user.device);
-
-  return {
-    appBuildNumber: getStringValue(
-      user.appBuildNumber,
-      user.buildNumber,
-      user.build,
-      appInfo?.buildNumber,
-      appInfo?.build,
-    ),
-    appVersion: getStringValue(
-      user.appVersion,
-      user.installedAppVersion,
-      user.clientVersion,
-      appInfo?.version,
-      appInfo?.appVersion,
-    ),
-    deviceModel: getStringValue(
-      user.deviceModel,
-      user.deviceName,
-      user.model,
-      deviceInfo?.model,
-      deviceInfo?.deviceModel,
-      deviceInfo?.name,
-    ),
-    osName: getStringValue(
-      user.osName,
-      user.operatingSystem,
-      user.platform,
-      deviceInfo?.osName,
-      deviceInfo?.os,
-      deviceInfo?.platform,
-    ),
-    osVersion: getStringValue(
-      user.osVersion,
-      user.operatingSystemVersion,
-      user.systemVersion,
-      deviceInfo?.osVersion,
-      deviceInfo?.systemVersion,
-    ),
-  };
-}
-
 const firebaseConfig: FirebaseOptions = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
@@ -221,7 +161,14 @@ export async function logoutAdmin() {
 
 export async function loadAdminUsers(
   environment: DatabaseEnvironment = 'production',
-  options: { page?: number; pageSize?: number; query?: string; status?: 'active' | 'all' | 'suspended' } = {},
+  options: {
+    page?: number;
+    pageSize?: number;
+    query?: string;
+    sortBy?: 'lastLogin' | 'participation';
+    sortDirection?: 'asc' | 'desc';
+    status?: 'active' | 'all' | 'suspended';
+  } = {},
 ): Promise<AdminUserPage> {
   const result = await callAdminFunction<RawAdminUserPage>('listAdminUsers', {
     environment,
@@ -232,7 +179,6 @@ export async function loadAdminUsers(
     ...result,
     users: result.users.map((user) => ({
       ...user,
-      ...getUserDeviceInfo(user),
       lastLoginAtTimestamp: getUserLastLoginTimestamp(user),
     })),
   };

@@ -9,6 +9,7 @@
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.102.1",
     "@vitejs/plugin-react": "latest",
     "firebase": "^12.16.0",
     "lucide-react": "latest",
