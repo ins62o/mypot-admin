@@ -12,6 +12,8 @@ import {
   Copy,
   Database,
   FileText,
+  FolderCheck,
+  FolderOpen,
   Inbox,
   ShieldAlert,
   Layers3,
@@ -1571,6 +1573,7 @@ function ModerationPage({ reports, onResolve }: { reports: ContentReport[]; onRe
   const [busy, setBusy] = useState(false);
   const [pendingAction, setPendingAction] = useState<ModerationAction | null>(null);
   const [error, setError] = useState('');
+  const [reportFolder, setReportFolder] = useState<'open' | 'processed'>('open');
   const [reportPage, setReportPage] = useState(1);
   const reasonLabels: Record<string, string> = {
     abuse: '괴롭힘 또는 욕설',
@@ -1583,8 +1586,11 @@ function ModerationPage({ reports, onResolve }: { reports: ContentReport[]; onRe
     violence: '폭력 또는 위협',
   };
   const typeLabels = { chatMessage: '채팅', feed: '피드', user: '사용자' };
-  const reportPageCount = Math.max(1, Math.ceil(reports.length / PAGE_SIZE));
-  const visibleReports = paginate(reports, reportPage);
+  const openReports = reports.filter((report) => report.status === 'open');
+  const processedReports = reports.filter((report) => report.status !== 'open');
+  const folderReports = reportFolder === 'open' ? openReports : processedReports;
+  const reportPageCount = Math.max(1, Math.ceil(folderReports.length / PAGE_SIZE));
+  const visibleReports = paginate(folderReports, reportPage);
 
   useEffect(() => {
     setReportPage((currentPage) => Math.min(currentPage, reportPageCount));
@@ -1599,18 +1605,44 @@ function ModerationPage({ reports, onResolve }: { reports: ContentReport[]; onRe
   }
   return <section className="moderationLayout">
     <article className="panel moderationList">
-      <div className="panelHeader"><div><p className="eyebrow">신고</p><h2>접수된 신고</h2></div><span className="moderationCount">미처리 {reports.filter(r => r.status === 'open').length}건</span></div>
-      <div className="tableWrap"><table><thead><tr><th>상태</th><th>유형</th><th>신고 대상</th><th>주머니</th><th>사유</th><th>접수 시각</th></tr></thead><tbody>
+      <div className="panelHeader"><div><p className="eyebrow">신고</p><h2>접수된 신고</h2></div></div>
+      <div aria-label="신고 처리 상태" className="moderationFolders" role="tablist">
+        <button
+          aria-controls="moderation-report-list"
+          aria-selected={reportFolder === 'open'}
+          className={reportFolder === 'open' ? 'active' : ''}
+          role="tab"
+          type="button"
+          onClick={() => { setReportFolder('open'); setReportPage(1); }}
+        >
+          <FolderOpen aria-hidden="true" size={17} />
+          <span>미처리</span>
+          <strong>{openReports.length.toLocaleString('ko-KR')}</strong>
+        </button>
+        <button
+          aria-controls="moderation-report-list"
+          aria-selected={reportFolder === 'processed'}
+          className={reportFolder === 'processed' ? 'active' : ''}
+          role="tab"
+          type="button"
+          onClick={() => { setReportFolder('processed'); setReportPage(1); }}
+        >
+          <FolderCheck aria-hidden="true" size={17} />
+          <span>처리 완료</span>
+          <strong>{processedReports.length.toLocaleString('ko-KR')}</strong>
+        </button>
+      </div>
+      <div className="tableWrap" id="moderation-report-list" role="tabpanel"><table><thead><tr><th>상태</th><th>신고 대상</th><th>유형</th><th>주머니</th><th>사유</th><th>접수 시각</th></tr></thead><tbody>
         {visibleReports.map(report => <tr className="moderationRow" key={report.id} onClick={() => { setSelected(report); setError(''); }}>
-          <td><span className={`reportStatus ${report.status}`}>{report.status === 'open' ? '미처리' : report.status === 'dismissed' ? '문제 없음' : '처리 완료'}</span></td><td>{typeLabels[report.targetType]}</td><td><strong>{report.targetName}</strong></td><td>{report.pocketName}</td><td>{reasonLabels[report.reason] ?? report.reason}</td><td>{report.createdAt ? new Date(report.createdAt).toLocaleString('ko-KR') : '-'}</td>
+          <td><span className={`reportStatus ${report.status}`}>{report.status === 'open' ? '미처리' : report.status === 'dismissed' ? '문제 없음' : '처리 완료'}</span></td><td><strong>{report.targetName}</strong></td><td>{typeLabels[report.targetType]}</td><td>{report.pocketName}</td><td>{reasonLabels[report.reason] ?? report.reason}</td><td>{report.createdAt ? new Date(report.createdAt).toLocaleString('ko-KR') : '-'}</td>
         </tr>)}
-        {!reports.length ? <tr><td className="emptyTableCell" colSpan={6}>접수된 신고가 없습니다.</td></tr> : null}
+        {!folderReports.length ? <tr><td className="emptyTableCell" colSpan={6}>{reportFolder === 'open' ? '미처리 신고가 없습니다.' : '처리 완료된 신고가 없습니다.'}</td></tr> : null}
       </tbody></table></div>
       <Pagination
         currentPage={reportPage}
         onChange={setReportPage}
         pageCount={reportPageCount}
-        totalCount={reports.length}
+        totalCount={folderReports.length}
       />
     </article>
     {selected ? <div className="pocketMembersBackdrop" role="presentation"><section className="pocketMembersDialog moderationDialog" role="dialog" aria-modal="true">

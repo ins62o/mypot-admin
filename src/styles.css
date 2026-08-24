@@ -465,9 +465,14 @@ button {
   grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
 }
 
-.moderationLayout { padding: 24px; }
+.moderationLayout { padding: 0; }
 .moderationList { min-height: 540px; }
-.moderationCount { background: #fff3c4; border-radius: 999px; color: #94690e; font-size: 12px; font-weight: 800; padding: 8px 12px; }
+.moderationFolders { align-items: flex-end; background: #fffaf0; border-bottom: 1px solid #f5e8cc; display: flex; gap: 6px; padding: 12px 16px 0; }
+.moderationFolders button { align-items: center; background: #fff3da; border: 1px solid #ead7b7; border-bottom: 0; border-radius: 11px 11px 0 0; color: #8b7355; display: inline-flex; font-weight: 900; gap: 7px; min-height: 43px; padding: 0 15px; position: relative; }
+.moderationFolders button.active { background: #fff; color: #5a371c; margin-bottom: -1px; min-height: 44px; }
+.moderationFolders button strong { align-items: center; background: #fff; border: 1px solid #ead7b7; border-radius: 999px; display: inline-flex; font-size: 11px; height: 22px; justify-content: center; min-width: 22px; padding: 0 6px; }
+.moderationFolders button.active strong { background: #fff3c4; border-color: #f0d48a; color: #805b10; }
+.moderationFolders button:focus-visible { outline: 3px solid rgba(246, 200, 76, .35); outline-offset: -3px; }
 .moderationRow { cursor: pointer; }
 .moderationRow:hover { background: #fff8e8; }
 .reportStatus { border-radius: 999px; display: inline-flex; font-size: 11px; font-weight: 800; padding: 7px 9px; }
@@ -650,7 +655,9 @@ button {
 .moderationResolved { background: #eaf8f5; border-radius: 10px; color: #15876d; padding: 14px; }
 
 @media (max-width: 640px) {
-  .moderationLayout { padding: 14px; }
+  .moderationLayout { padding: 0; }
+  .moderationFolders { overflow-x: auto; padding-left: 12px; padding-right: 12px; }
+  .moderationFolders button { flex: 0 0 auto; }
   .pocketMembersDialog.moderationDialog { width: calc(100vw - 28px); }
   .moderationDetail { padding: 18px; }
   .evidenceSummaryMeta { grid-template-columns: 1fr; }
@@ -1337,7 +1344,7 @@ th {
 }
 
 .compactTable table {
-  min-width: 760px;
+  min-width: 620px;
 }
 
 .pocketPanelHeader {
