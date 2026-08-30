@@ -3407,25 +3407,29 @@ tbody tr {
   font-weight: 900;
 }
 
-.updateModeGroup > div,
-.updatePlatformTabs {
+.updateModeGroup > div {
   display: flex;
   gap: 6px;
 }
 
-.updatePlatformPublishNotice {
-  margin: -8px 0 0;
+.updateSharedReleaseNotice {
+  background: #fffdf7;
+  border: 1px solid #f0dfb9;
+  border-radius: 12px;
   color: #6b7280;
+  display: grid;
   font-size: 13px;
+  gap: 3px;
   line-height: 1.55;
+  margin: 0;
+  padding: 12px 14px;
 }
 
-.updatePlatformPublishNotice strong {
-  color: #111827;
+.updateSharedReleaseNotice strong {
+  color: #5a371c;
 }
 
-.updateModeGroup button,
-.updatePlatformTabs button {
+.updateModeGroup button {
   background: #ffffff;
   border: 1px solid #ead7b7;
   border-radius: 9px;
@@ -3436,16 +3440,10 @@ tbody tr {
   padding: 0 12px;
 }
 
-.updateModeGroup button.active,
-.updatePlatformTabs button.active {
+.updateModeGroup button.active {
   background: #f6c84c;
   border-color: #dfae2a;
   color: #5a371c;
-}
-
-.updatePlatformTabs {
-  border-bottom: 1px solid #f5e8cc;
-  padding-bottom: 12px;
 }
 
 .updateFieldGrid {
@@ -3463,8 +3461,7 @@ tbody tr {
 }
 
 .updateFieldGrid input,
-.updateFieldGrid textarea,
-.updateHighlightEditor input {
+.updateFieldGrid textarea {
   background: #fffdf7;
   border: 1px solid #ead7b7;
   border-radius: 10px;
@@ -3474,12 +3471,6 @@ tbody tr {
   padding: 9px 11px;
 }
 
-.updateHighlightEditor input {
-  font-size: 11px;
-  min-height: 30px;
-  padding: 4px 9px;
-}
-
 .updateFieldGrid textarea {
   line-height: 20px;
   min-height: 78px;
@@ -3487,8 +3478,7 @@ tbody tr {
 }
 
 .updateFieldGrid input:focus,
-.updateFieldGrid textarea:focus,
-.updateHighlightEditor input:focus {
+.updateFieldGrid textarea:focus {
   border-color: #dfae2a;
   box-shadow: 0 0 0 3px rgba(246, 200, 76, 0.2);
 }
@@ -3496,63 +3486,6 @@ tbody tr {
 .updateFieldGrid input:disabled {
   background: #f5efe4;
   color: #aa9478;
-}
-
-.updateHighlightEditor {
-  display: grid;
-  gap: 8px;
-}
-
-.updateHighlightEditor > div {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-}
-
-.updateHighlightEditor h3 {
-  font-size: 14px;
-  margin: 0;
-}
-
-.updateHighlightEditor > div > div {
-  display: grid;
-  gap: 3px;
-}
-
-.updateHighlightEditor > div small {
-  color: #8b7355;
-  font-size: 11px;
-}
-
-.updateHighlightEditor > div button,
-.updateHighlightEditor label button {
-  background: #ffffff;
-  border: 1px solid #ead7b7;
-  border-radius: 8px;
-  color: #755126;
-  font-size: 11px;
-  font-weight: 900;
-  min-height: 30px;
-  padding: 0 10px;
-}
-
-.updateHighlightEditor label {
-  align-items: center;
-  display: grid;
-  gap: 8px;
-  grid-template-columns: 28px 1fr auto;
-}
-
-.updateHighlightEditor label > span {
-  align-items: center;
-  background: #fff3c4;
-  border-radius: 8px;
-  color: #94690e;
-  display: flex;
-  font-size: 12px;
-  font-weight: 900;
-  height: 30px;
-  justify-content: center;
 }
 
 .updatePublishBar {
@@ -3593,10 +3526,29 @@ tbody tr {
   opacity: 0.55;
 }
 
-.updatePreviewPanel > .panelHeader > span {
+.updatePreviewPlatformTabs {
+  background: #fffaf0;
+  border: 1px solid #ead7b7;
+  border-radius: 9px;
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+}
+
+.updatePreviewPlatformTabs button {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
   color: #8b7355;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
+  min-height: 28px;
+  padding: 0 9px;
+}
+
+.updatePreviewPlatformTabs button.active {
+  background: #f6c84c;
+  color: #5a371c;
 }
 
 .updatePublishPolicy {

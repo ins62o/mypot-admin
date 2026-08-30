@@ -11,7 +11,6 @@ import {
 import type {
   AppUpdateConfig,
   AppUpdatePlatform,
-  AppUpdatePublishTarget,
   AppUpdateRelease,
 } from '../types/admin';
 import { AppUpdateCard } from './AppUpdateCard';
@@ -22,10 +21,6 @@ const FIXED_DISMISS_LABEL = '나중에 하기';
 
 function platformLabel(platform: AppUpdatePlatform) {
   return platform === 'ios' ? 'iOS' : 'Android';
-}
-
-function publishTargetLabel(target: AppUpdatePublishTarget) {
-  return target === 'all' ? 'iOS · Android' : platformLabel(target);
 }
 
 function releaseVersionLabel(release: AppUpdateRelease) {
@@ -80,9 +75,8 @@ export function AppUpdateManagement({
   environment: DatabaseEnvironment;
 }) {
   const [config, setConfig] = useState<AppUpdateConfig>(defaultConfig);
-  const [platform, setPlatform] = useState<AppUpdatePlatform>('ios');
-  const [publishTarget, setPublishTarget] =
-    useState<AppUpdatePublishTarget>('ios');
+  const [previewPlatform, setPreviewPlatform] =
+    useState<AppUpdatePlatform>('ios');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishConfirmOpen, setIsPublishConfirmOpen] = useState(false);
@@ -135,43 +129,33 @@ export function AppUpdateManagement({
     };
   }, [environment]);
 
-  function updatePlatform(
-    field: 'latestVersion' | 'storeUrl',
-    value: string,
-  ) {
+  function updateSharedVersion(value: string) {
+    setConfig((current) => ({
+      ...current,
+      platforms: {
+        android: {
+          ...current.platforms.android,
+          latestVersion: value,
+        },
+        ios: {
+          ...current.platforms.ios,
+          latestVersion: value,
+        },
+      },
+    }));
+  }
+
+  function updateStoreUrl(platform: AppUpdatePlatform, value: string) {
     setConfig((current) => ({
       ...current,
       platforms: {
         ...current.platforms,
         [platform]: {
           ...current.platforms[platform],
-          [field]: value,
+          storeUrl: value,
         },
       },
     }));
-  }
-
-  function updateHighlight(index: number, value: string) {
-    setConfig((current) => ({
-      ...current,
-      highlights: current.highlights.map((item, itemIndex) =>
-        itemIndex === index ? value : item,
-      ),
-    }));
-  }
-
-  function selectPlatform(nextPlatform: AppUpdatePlatform) {
-    setPlatform(nextPlatform);
-    if (publishTarget !== 'all') {
-      setPublishTarget(nextPlatform);
-    }
-  }
-
-  function selectPublishTarget(nextTarget: AppUpdatePublishTarget) {
-    setPublishTarget(nextTarget);
-    if (nextTarget !== 'all') {
-      setPlatform(nextTarget);
-    }
   }
 
   function requestPublish(event: FormEvent<HTMLFormElement>) {
@@ -191,15 +175,25 @@ export function AppUpdateManagement({
           ...config,
           buttonLabel: FIXED_UPDATE_BUTTON_LABEL,
           dismissLabel: FIXED_DISMISS_LABEL,
+          highlights:
+            config.highlights.length > 0
+              ? config.highlights
+              : defaultConfig.highlights,
+          platforms: {
+            android: {
+              ...config.platforms.android,
+              latestVersion: config.platforms.ios.latestVersion,
+            },
+            ios: config.platforms.ios,
+          },
           summary: '',
           title: FIXED_UPDATE_TITLE,
         },
-        publishTarget,
         environment,
       );
       setConfig(savedConfig);
       setReleases(await loadAdminAppUpdateReleases(environment));
-      setMessage(`${publishTargetLabel(publishTarget)} 업데이트를 게시하고 사용자에게 적용했어요.`);
+      setMessage('iOS와 Android 업데이트를 함께 게시했어요.');
     } catch {
       setMessage('게시하지 못했어요. 버전과 스토어 주소를 확인해 주세요.');
     } finally {
@@ -241,7 +235,11 @@ export function AppUpdateManagement({
 
   const environmentLabel = environment === 'production' ? '운영' : '개발';
   const webViewUrl =
-    `https://admin.mypot.kr/app-update/index.html?platform=${platform}`;
+    `https://admin.mypot.kr/app-update/index.html?platform=${previewPlatform}`;
+  const minimumVersionLabel =
+    config.platforms.ios.minimumVersion === config.platforms.android.minimumVersion
+      ? config.platforms.ios.minimumVersion
+      : `iOS ${config.platforms.ios.minimumVersion} · Android ${config.platforms.android.minimumVersion}`;
 
   async function copyWebViewUrl() {
     try {
@@ -281,57 +279,17 @@ export function AppUpdateManagement({
             </div>
           </div>
 
-          <div className="updatePlatformTabs">
-            {(['ios', 'android'] as const).map((item) => (
-              <button
-                className={platform === item ? 'active' : ''}
-                key={item}
-                type="button"
-                onClick={() => selectPlatform(item)}
-              >
-                {item === 'ios' ? 'iOS' : 'Android'}
-              </button>
-            ))}
-          </div>
-
-          <div className="updateModeGroup updatePublishTargetGroup">
-            <span>게시 대상</span>
-            <div>
-              {(['ios', 'android', 'all'] as const).map((target) => (
-                <button
-                  className={publishTarget === target ? 'active' : ''}
-                  key={target}
-                  type="button"
-                  onClick={() => selectPublishTarget(target)}
-                >
-                  {target === 'all'
-                    ? 'iOS + Android'
-                    : `${platformLabel(target)}만`}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <p className="updatePlatformPublishNotice">
-            {publishTarget === 'all' ? (
-              <>
-                <strong>iOS와 Android</strong> 설정을 한 번에 게시하고 이력을 한
-                행으로 저장합니다.
-              </>
-            ) : (
-              <>
-                <strong>{platformLabel(publishTarget)}</strong>만 게시하며, 다른
-                플랫폼의 버전과 스토어 설정은 그대로 유지합니다.
-              </>
-            )}
+          <p className="updateSharedReleaseNotice">
+            <strong>iOS와 Android는 같은 버전으로 함께 배포돼요.</strong>
+            버전과 업데이트 방식은 공통으로 적용하고, 스토어 주소만 플랫폼별로 관리합니다.
           </p>
 
           <div className="updateFieldGrid">
             <label>
-              최신 버전
+              공통 최신 버전
               <input
-                value={config.platforms[platform].latestVersion}
-                onChange={(event) => updatePlatform('latestVersion', event.target.value)}
+                value={config.platforms.ios.latestVersion}
+                onChange={(event) => updateSharedVersion(event.target.value)}
               />
             </label>
             <label className="updateMinimumField">
@@ -342,60 +300,23 @@ export function AppUpdateManagement({
               <input
                 aria-label="최소 지원 버전"
                 readOnly
-                value={config.platforms[platform].minimumVersion}
+                value={minimumVersionLabel}
               />
             </label>
-            <label className="wideField">
-              스토어 주소
+            <label>
+              iOS App Store 주소
               <input
-                value={config.platforms[platform].storeUrl}
-                onChange={(event) => updatePlatform('storeUrl', event.target.value)}
+                value={config.platforms.ios.storeUrl}
+                onChange={(event) => updateStoreUrl('ios', event.target.value)}
               />
             </label>
-          </div>
-
-          <div className="updateHighlightEditor">
-            <div>
-              <div>
-                <h3>업데이트 내용</h3>
-                <small>PC와 모바일 모두 최대 3개까지 작성할 수 있어요.</small>
-              </div>
-              <button
-                disabled={config.highlights.length >= 3}
-                type="button"
-                onClick={() =>
-                  setConfig({
-                    ...config,
-                    highlights: [...config.highlights, '새로운 업데이트 내용'],
-                  })
-                }
-              >
-                항목 추가
-              </button>
-            </div>
-            {config.highlights.map((highlight, index) => (
-              <label key={index}>
-                <span>{index + 1}</span>
-                <input
-                  value={highlight}
-                  onChange={(event) => updateHighlight(index, event.target.value)}
-                />
-                <button
-                  disabled={config.highlights.length <= 1}
-                  type="button"
-                  onClick={() =>
-                    setConfig({
-                      ...config,
-                      highlights: config.highlights.filter(
-                        (_, itemIndex) => itemIndex !== index,
-                      ),
-                    })
-                  }
-                >
-                  삭제
-                </button>
-              </label>
-            ))}
+            <label>
+              Android Play Store 주소
+              <input
+                value={config.platforms.android.storeUrl}
+                onChange={(event) => updateStoreUrl('android', event.target.value)}
+              />
+            </label>
           </div>
 
         </div>
@@ -403,7 +324,7 @@ export function AppUpdateManagement({
         <div className="updateReleaseHistory">
           <div>
             <h3>업데이트 게시 이력</h3>
-            <small>사용자에게는 항상 가장 최근 게시물의 내용만 보여요.</small>
+            <small>가장 최근에 게시한 업데이트 설정만 사용자에게 적용돼요.</small>
           </div>
           {releases.length > 0 ? (
             <div className="updateReleaseList">
@@ -411,7 +332,9 @@ export function AppUpdateManagement({
                 <article key={release.id}>
                   <div>
                     <strong>
-                      {publishTargetLabel(release.targetPlatform)} 업데이트
+                      {release.targetPlatform === 'all'
+                        ? 'iOS · Android 업데이트'
+                        : `${platformLabel(release.targetPlatform)} 업데이트`}
                     </strong>
                     <span className={release.mode}>
                       {release.mode === 'required' ? '강제 업데이트' : '선택 업데이트'}
@@ -455,7 +378,7 @@ export function AppUpdateManagement({
             ) : null}
           </div>
           <button disabled={isLoading || isSaving} type="submit">
-            {isSaving ? '게시 중' : `${publishTargetLabel(publishTarget)} 업데이트 게시`}
+            {isSaving ? '게시 중' : '업데이트 게시'}
           </button>
         </div>
       </form>
@@ -466,11 +389,24 @@ export function AppUpdateManagement({
             <p className="eyebrow">WebView</p>
             <h2>모바일 미리보기</h2>
           </div>
-          <span>{platform === 'ios' ? 'iOS' : 'Android'}</span>
+          <div className="updatePreviewPlatformTabs" role="tablist" aria-label="미리보기 플랫폼">
+            {(['ios', 'android'] as const).map((item) => (
+              <button
+                aria-selected={previewPlatform === item}
+                className={previewPlatform === item ? 'active' : ''}
+                key={item}
+                role="tab"
+                type="button"
+                onClick={() => setPreviewPlatform(item)}
+              >
+                {platformLabel(item)}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="updatePhonePreview">
           <div className="updatePhoneScreen">
-            <AppUpdateCard config={config} platform={platform} preview />
+            <AppUpdateCard config={config} platform={previewPlatform} preview />
           </div>
         </div>
         <div className="updateWebViewUrl">
@@ -501,12 +437,10 @@ export function AppUpdateManagement({
               {config.mode === 'required' ? '강제 업데이트' : '선택 업데이트'}
             </span>
             <h2 id="update-publish-confirm-title">
-              {publishTargetLabel(publishTarget)} 업데이트를 게시할까요?
+              iOS · Android 업데이트를 게시할까요?
             </h2>
             <p>
-              {publishTarget === 'all'
-                ? '두 플랫폼에 즉시 반영되며 게시 이력은 한 행으로 저장됩니다.'
-                : `${platformLabel(publishTarget)}에만 즉시 반영되며 다른 플랫폼 버전은 유지됩니다.`}
+              공통 버전과 업데이트 방식이 두 플랫폼에 즉시 반영되고 게시 이력은 한 행으로 저장됩니다.
             </p>
             {config.mode === 'required' ? (
               <strong>강제 업데이트는 이전 버전 사용자의 앱 이용을 제한할 수 있어요.</strong>
