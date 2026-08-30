@@ -2887,6 +2887,135 @@ tbody tr {
   line-height: 19px;
 }
 
+.storageUsageCard {
+  background: #fffdf7;
+  border: 1px solid #f1dfb8;
+  border-radius: 12px;
+  display: grid;
+  gap: 14px;
+  margin: 0 14px 14px;
+  padding: 16px;
+}
+
+.storageUsageHeader {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.storageUsageHeader h3 {
+  color: #5a371c;
+  font-size: 17px;
+  line-height: 24px;
+  margin: 2px 0 0;
+}
+
+.storageUsageHeader > strong {
+  background: #eaf8f5;
+  border: 1px solid #b9e7dc;
+  border-radius: 999px;
+  color: #15876d;
+  font-size: 12px;
+  line-height: 18px;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
+.storageUsageCard.warning .storageUsageHeader > strong {
+  background: #fff3cf;
+  border-color: #f0d27c;
+  color: #9a6811;
+}
+
+.storageUsageCard.danger .storageUsageHeader > strong {
+  background: #ffe8ed;
+  border-color: #f3bac6;
+  color: #b24d62;
+}
+
+.storageUsageHeader > strong.unavailable {
+  background: #f5efe4;
+  border-color: #ead7b7;
+  color: #8b7355;
+}
+
+.storageUsageValues {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.storageUsageValues > div {
+  background: #fff8e9;
+  border: 1px solid #f5e8cc;
+  border-radius: 10px;
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+}
+
+.storageUsageValues span {
+  color: #8b7355;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.storageUsageValues strong {
+  color: #5a371c;
+  font-size: 16px;
+  line-height: 22px;
+}
+
+.storageUsageTrack {
+  background: #f3ead9;
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.storageUsageTrack > span {
+  background: #4bb49c;
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  min-width: 3px;
+  transition: width 240ms ease;
+}
+
+.storageUsageCard.warning .storageUsageTrack > span {
+  background: #e8ac2a;
+}
+
+.storageUsageCard.danger .storageUsageTrack > span {
+  background: #df7188;
+}
+
+.storageUsageMeta,
+.storageUsageEmpty,
+.storageUsageGuide {
+  color: #8b7355;
+  font-size: 12px;
+  line-height: 18px;
+  margin: 0;
+}
+
+.storageUsageMeta {
+  margin-top: -8px;
+  text-align: right;
+}
+
+.storageUsageEmpty {
+  background: #fff8e9;
+  border-radius: 9px;
+  padding: 12px;
+}
+
+.storageUsageGuide {
+  border-top: 1px solid #f5e8cc;
+  padding-top: 12px;
+}
+
 .dataSourcePill {
   align-items: center;
   border-radius: 999px;

@@ -49,23 +49,6 @@ export type ContentReport = {
   targetId: string; targetName: string; targetType: 'chatMessage' | 'feed' | 'user'; targetUid: string;
 };
 
-export type VersionPatchNote = {
-  description: string;
-  title: string;
-};
-
-export type VersionReleaseType = 'major' | 'minor' | 'patch';
-
-export type VersionNote = {
-  id: string;
-  version: string;
-  releasedAt: string;
-  releaseType: VersionReleaseType;
-  summary: string;
-  patches: VersionPatchNote[];
-  status: 'draft' | 'published';
-};
-
 export type AppUpdateMode = 'optional' | 'required';
 export type AppUpdatePlatform = 'android' | 'ios';
 export type AppUpdatePublishTarget = AppUpdatePlatform | 'all';
@@ -135,6 +118,13 @@ export type DatabaseBackupStatus = {
   projectId: string;
   restoreSupported: boolean;
   restoreSummary: string;
+  storageUsage: DatabaseStorageUsage | null;
+};
+
+export type DatabaseStorageUsage = {
+  freeQuotaBytes: number;
+  measuredAt: string;
+  usedBytes: number;
 };
 
 export type DatabaseBackup = {

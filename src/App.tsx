@@ -11,7 +11,6 @@ import {
   ChevronRight,
   Copy,
   Database,
-  FileText,
   FolderCheck,
   FolderOpen,
   Inbox,
@@ -30,10 +29,9 @@ import kakaoLogo from './assets/social/kakao-login.svg';
 import { AdminSearch } from './components/AdminSearch';
 import { AppNoticeManagement } from './components/AppNoticeManagement';
 import { StatCard } from './components/StatCard';
-import type { AdminDashboardMetrics, AdminPocket, AdminPocketMember, AdminUser, AdminUserPage, ContentReport, DatabaseBackup, DatabaseBackupStatus, ModerationAction, SupportInquiry, VersionNote, VersionReleaseType } from './types/admin';
+import type { AdminDashboardMetrics, AdminPocket, AdminPocketMember, AdminUser, AdminUserPage, ContentReport, DatabaseBackup, DatabaseBackupStatus, ModerationAction, SupportInquiry } from './types/admin';
 import {
   answerSupportInquiry as answerSupportInquiryRemote,
-  deleteAdminVersionNote,
   isFirebaseConfigured,
   loadAdminDashboardMetrics,
   loadAdminContentReports,
@@ -42,12 +40,10 @@ import {
   loadAdminPocketMembers,
   loadAdminSupportInquiries,
   loadAdminUsers,
-  loadAdminVersionNotes,
   loginAdminWithEmail,
   logoutAdmin,
   resolveAdminContentReport,
   setAdminUserSuspension,
-  saveAdminVersionNote,
   startAdminDatabaseRestore,
   subscribeToAdminSession,
   type DatabaseEnvironment,
@@ -90,7 +86,7 @@ const compactAdminDateFormatter = new Intl.DateTimeFormat('ko-KR', {
   year: 'numeric',
 });
 
-type AdminPage = 'dashboard' | 'database' | 'moderation' | 'updates' | 'versions' | 'support';
+type AdminPage = 'dashboard' | 'database' | 'moderation' | 'updates' | 'support';
 type DataSourceStatus = 'firebase' | 'loading' | 'error';
 type UserDetailTab = 'moderation' | 'profile';
 type PocketDetailTab = 'members' | 'moderation' | 'overview';
@@ -123,7 +119,6 @@ const pageTitle: Record<AdminPage, string> = {
   moderation: '신고 관리',
   support: '1:1 문의',
   updates: '앱 공지 관리',
-  versions: '버전 노트',
 };
 
 function adminUsersQueryOptions(
@@ -1058,9 +1053,6 @@ function App() {
   const [page, setPage] = useState<AdminPage>('dashboard');
   const [registeredUserCount, setRegisteredUserCount] = useState(0);
   const [pockets, setPockets] = useState<AdminPocket[]>([]);
-  const [versionNotes, setVersionNotes] = useState<VersionNote[]>(() =>
-    ensureVersionNoteDraft([]),
-  );
   const [supportInquiries, setSupportInquiries] = useState<SupportInquiry[]>([]);
   const [contentReports, setContentReports] = useState<ContentReport[]>([]);
   const [dataSourceStatus, setDataSourceStatus] = useState<DataSourceStatus>('loading');
@@ -1086,7 +1078,6 @@ function App() {
     useState<AdminDashboardMetrics>({ pocketWeeklyDelta: 0, userWeeklyDelta: 0 });
   const [loadedDashboardEnvironment, setLoadedDashboardEnvironment] =
     useState<DatabaseEnvironment | null>(null);
-  const [selectedVersionId, setSelectedVersionId] = useState('version_1.0.0');
 
   const activePocketCount = pockets.filter(
     (pocketItem) => pocketItem.status === 'active',
@@ -1094,10 +1085,6 @@ function App() {
   const pendingDeletionPocketCount = pockets.filter(
     (pocketItem) => pocketItem.status === 'pendingDeletion',
   ).length;
-  const selectedVersion =
-    versionNotes.find((note) => note.id === selectedVersionId) ??
-    versionNotes[0] ??
-    null;
   const waitingInquiryCount = supportInquiries.filter(
     (inquiry) => inquiry.status === 'waiting',
   ).length;
@@ -1162,11 +1149,10 @@ function App() {
     Promise.allSettled([
       usersRequest,
       pocketsRequest,
-      loadAdminVersionNotes(databaseEnvironment),
       loadAdminSupportInquiries(databaseEnvironment),
       loadAdminDashboardMetrics(databaseEnvironment),
       loadAdminContentReports(databaseEnvironment),
-    ]).then(([loadedUsers, loadedPockets, loadedNotes, loadedInquiries, loadedMetrics, loadedReports]) => {
+    ]).then(([loadedUsers, loadedPockets, loadedInquiries, loadedMetrics, loadedReports]) => {
       if (!isMounted) {
         return;
       }
@@ -1176,19 +1162,6 @@ function App() {
       }
       if (loadedPockets.status === 'fulfilled') {
         setPockets(loadedPockets.value);
-      }
-      if (loadedNotes.status === 'fulfilled') {
-        const notesWithDraft = ensureVersionNoteDraft(loadedNotes.value);
-        setVersionNotes(notesWithDraft);
-        setSelectedVersionId(
-          notesWithDraft.find((note) => note.status === 'draft')?.id ??
-            notesWithDraft[0]?.id ??
-            '',
-        );
-      } else {
-        const fallbackNotes = ensureVersionNoteDraft([]);
-        setVersionNotes(fallbackNotes);
-        setSelectedVersionId(fallbackNotes[0].id);
       }
       if (loadedInquiries.status === 'fulfilled') {
         setSupportInquiries(loadedInquiries.value);
@@ -1411,14 +1384,6 @@ function App() {
               <span>앱 공지 관리</span>
             </button>
             <button
-              className={page === 'versions' ? 'active' : ''}
-              type="button"
-              onClick={() => setPage('versions')}
-            >
-              <span className="navIcon"><FileText size={18} /></span>
-              <span>버전 노트</span>
-            </button>
-            <button
               className={page === 'support' ? 'active' : ''}
               type="button"
               onClick={() => setPage('support')}
@@ -1486,18 +1451,6 @@ function App() {
             environment={databaseEnvironment}
             firebaseStatusMessage={databaseStatusMessage}
             onEnvironmentChange={handleDatabaseEnvironmentChange}
-          />
-        ) : null}
-
-        {page === 'versions' ? (
-          <VersionNotesPage
-            environment={databaseEnvironment}
-            notes={versionNotes}
-            onChangeNotes={setVersionNotes}
-            onDeleteNote={(note) => deleteAdminVersionNote(note.id, databaseEnvironment)}
-            onSaveNote={(note) => saveAdminVersionNote(note, databaseEnvironment)}
-            onSelectNote={setSelectedVersionId}
-            selectedNote={selectedVersion}
           />
         ) : null}
 
@@ -2672,6 +2625,15 @@ function DatabaseStatusPage({
   const [isEnvironmentMenuOpen, setIsEnvironmentMenuOpen] = useState(false);
 
   const environmentLabel = environment === 'production' ? '운영' : '개발';
+  const storageUsage = databaseBackupStatus?.storageUsage ?? null;
+  const storageUsagePercent = storageUsage
+    ? Math.max(0, (storageUsage.usedBytes / storageUsage.freeQuotaBytes) * 100)
+    : 0;
+  const storageUsageTone = storageUsagePercent >= 90
+    ? 'danger'
+    : storageUsagePercent >= 70
+      ? 'warning'
+      : 'safe';
 
   function selectEnvironment(nextEnvironment: DatabaseEnvironment) {
     setIsEnvironmentMenuOpen(false);
@@ -2815,6 +2777,61 @@ function DatabaseStatusPage({
                 <strong>{databaseBackupStatus.deleteProtectionState}</strong>
               </div>
             </div>
+
+            <section className={`storageUsageCard ${storageUsageTone}`}>
+              <div className="storageUsageHeader">
+                <div>
+                  <p className="eyebrow">Free quota</p>
+                  <h3>Firestore 저장소 사용량</h3>
+                </div>
+                {storageUsage ? (
+                  <strong>{formatStorageUsagePercent(storageUsagePercent)} 사용</strong>
+                ) : (
+                  <strong className="unavailable">집계 대기</strong>
+                )}
+              </div>
+
+              {storageUsage ? (
+                <>
+                  <div className="storageUsageValues">
+                    <div>
+                      <span>현재 사용</span>
+                      <strong>{formatStorageBytes(storageUsage.usedBytes)}</strong>
+                    </div>
+                    <div>
+                      <span>무료 제공량</span>
+                      <strong>{formatStorageBytes(storageUsage.freeQuotaBytes)}</strong>
+                    </div>
+                    <div>
+                      <span>남은 용량</span>
+                      <strong>{formatStorageBytes(Math.max(0, storageUsage.freeQuotaBytes - storageUsage.usedBytes))}</strong>
+                    </div>
+                  </div>
+                  <div
+                    aria-label={`Firestore 무료 저장소 중 ${formatStorageUsagePercent(storageUsagePercent)} 사용`}
+                    aria-valuemax={100}
+                    aria-valuemin={0}
+                    aria-valuenow={Math.min(100, Math.round(storageUsagePercent))}
+                    className="storageUsageTrack"
+                    role="progressbar"
+                  >
+                    <span style={{ width: `${Math.min(100, storageUsagePercent)}%` }} />
+                  </div>
+                  <p className="storageUsageMeta">
+                    최근 측정 {formatAdminDateTime(storageUsage.measuredAt)}
+                  </p>
+                </>
+              ) : (
+                <p className="storageUsageEmpty">
+                  Cloud Monitoring 사용량을 아직 불러오지 못했어요. 함수 권한과 배포 상태를 확인해 주세요.
+                </p>
+              )}
+
+              <p className="storageUsageGuide">
+                데이터와 인덱스 저장량을 Firestore 무료 제공량 1 GiB 기준으로 비교해요.
+                백업과 PITR 저장량은 포함하지 않습니다.
+              </p>
+            </section>
 
             <div className="databaseRestoreNotice">
               <strong>복원 기능</strong>
@@ -3006,423 +3023,6 @@ function Pagination({
   );
 }
 
-const releaseTypeLabel: Record<VersionReleaseType, string> = {
-  major: '메이저',
-  minor: '마이너',
-  patch: '패치',
-};
-
-type VersionNotesPageProps = {
-  environment: DatabaseEnvironment;
-  notes: VersionNote[];
-  onChangeNotes: (notes: VersionNote[]) => void;
-  onDeleteNote: (note: VersionNote) => Promise<void> | void;
-  onSaveNote: (note: VersionNote) => Promise<void> | void;
-  onSelectNote: (id: string) => void;
-  selectedNote: VersionNote | null;
-};
-
-function VersionNotesPage({
-  environment,
-  notes,
-  onChangeNotes,
-  onDeleteNote,
-  onSaveNote,
-  onSelectNote,
-  selectedNote,
-}: VersionNotesPageProps) {
-  const [saveMessage, setSaveMessage] = useState('');
-  const [savedVersionNote, setSavedVersionNote] = useState<VersionNote | null>(null);
-  const [notePendingDeletion, setNotePendingDeletion] = useState<VersionNote | null>(null);
-  const [isDeletingVersionNote, setIsDeletingVersionNote] = useState(false);
-  const [isSavingVersionNote, setIsSavingVersionNote] = useState(false);
-  const environmentLabel = environment === 'production' ? '운영' : '개발';
-
-  function updateSelectedNote(nextNote: VersionNote) {
-    if (!selectedNote) {
-      return;
-    }
-
-    setSaveMessage('');
-    onChangeNotes(
-      notes.map((note) => (note.id === selectedNote.id ? nextNote : note)),
-    );
-  }
-
-  function createVersionNote() {
-    const existingDraft = notes.find((note) => note.status === 'draft');
-    if (existingDraft) {
-      setSaveMessage(`${existingDraft.version} 버전을 작성 중이에요.`);
-      onSelectNote(existingDraft.id);
-      return;
-    }
-
-    const version = getNextPatchVersion(notes);
-    const newNote = createVersionNoteDraft(version, notes.length === 0);
-
-    setSaveMessage(`${version} 새 노트 생성`);
-    onChangeNotes([newNote, ...notes]);
-    onSelectNote(newNote.id);
-  }
-
-  async function saveVersionNote() {
-    if (!selectedNote || isSavingVersionNote) {
-      return;
-    }
-
-    const releaseType = detectReleaseType(selectedNote.version, notes, selectedNote.id);
-    const noteToSave = {
-      ...selectedNote,
-      releaseType,
-      status: 'published' as const,
-    };
-
-    try {
-      setIsSavingVersionNote(true);
-      await onSaveNote(noteToSave);
-      const publishedNotes = notes
-        .map((note) => (note.id === selectedNote.id ? noteToSave : note))
-        .sort(compareVersionNotes);
-      const nextVersion = getNextPatchVersion(publishedNotes);
-      const nextDraft = createVersionNoteDraft(nextVersion, false);
-      onChangeNotes([nextDraft, ...publishedNotes]);
-      onSelectNote(nextDraft.id);
-      setSaveMessage(`${selectedNote.version} 작성 완료 · ${nextVersion} 작성 중`);
-      setSavedVersionNote(noteToSave);
-    } catch {
-      setSaveMessage('저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
-    } finally {
-      setIsSavingVersionNote(false);
-    }
-  }
-
-  function requestVersionNoteDeletion() {
-    if (!selectedNote || isDeletingVersionNote || isSavingVersionNote) {
-      return;
-    }
-
-    setNotePendingDeletion(selectedNote);
-  }
-
-  async function deleteVersionNote() {
-    if (!notePendingDeletion || isDeletingVersionNote || isSavingVersionNote) {
-      return;
-    }
-
-    try {
-      setIsDeletingVersionNote(true);
-      await onDeleteNote(notePendingDeletion);
-      const remainingNotes = notes.filter((note) => note.id !== notePendingDeletion.id);
-      onChangeNotes(remainingNotes);
-      onSelectNote(remainingNotes[0]?.id ?? '');
-      setNotePendingDeletion(null);
-      setSaveMessage('버전 노트를 삭제했어요.');
-    } catch {
-      setSaveMessage('삭제하지 못했어요. 잠시 후 다시 시도해 주세요.');
-    } finally {
-      setIsDeletingVersionNote(false);
-    }
-  }
-
-  function updatePatch(
-    index: number,
-    field: 'description' | 'title',
-    value: string,
-  ) {
-    if (!selectedNote) {
-      return;
-    }
-
-    updateSelectedNote({
-      ...selectedNote,
-      patches: selectedNote.patches.map((patch, patchIndex) =>
-        patchIndex === index ? { ...patch, [field]: value } : patch,
-      ),
-    });
-  }
-
-  function addPatch() {
-    if (!selectedNote) {
-      return;
-    }
-
-    updateSelectedNote({
-      ...selectedNote,
-      patches: [
-        ...selectedNote.patches,
-        { description: '변경 내용을 입력해 주세요.', title: '새 패치 항목' },
-      ],
-    });
-  }
-
-  function removePatch(index: number) {
-    if (!selectedNote) {
-      return;
-    }
-
-    if (selectedNote.patches.length <= 1) {
-      return;
-    }
-
-    updateSelectedNote({
-      ...selectedNote,
-      patches: selectedNote.patches.filter((_, patchIndex) => patchIndex !== index),
-    });
-  }
-
-  return (
-    <section className="versionEditorLayout">
-      <aside className="panel versionHistoryPanel">
-        <div className="panelHeader compact versionHistoryHeader">
-          <div>
-            <p className="eyebrow">History</p>
-            <h2>{environmentLabel} 이전 버전 노트</h2>
-          </div>
-          <button type="button" onClick={createVersionNote}>
-            새 노트 작성
-          </button>
-        </div>
-        <div className="versionHistoryList simpleVersionList">
-          <div className="releaseLegend">
-            <span><i className="legendDot patch" />패치</span>
-            <span><i className="legendDot minor" />마이너</span>
-            <span><i className="legendDot major" />메이저</span>
-          </div>
-          {notes.map((note) => (
-            <button
-              className={
-                note.id === selectedNote?.id
-                  ? 'versionHistoryItem selected'
-                  : 'versionHistoryItem'
-              }
-              key={note.id}
-              type="button"
-              onClick={() => onSelectNote(note.id)}
-            >
-              <div>
-                <strong>{note.version}</strong>
-                <span className="versionHistoryTags">
-                  <span className={`releaseTypeTag ${note.releaseType}`}>
-                    {releaseTypeLabel[note.releaseType]}
-                  </span>
-                  <span className={`versionStatusTag ${note.status}`}>
-                    {note.status === 'draft' ? '작성 중' : '작성 완료'}
-                  </span>
-                </span>
-              </div>
-              <small>{note.releasedAt}</small>
-            </button>
-          ))}
-          {notes.length === 0 ? (
-            <div className="emptyHistoryState">데이터 없음</div>
-          ) : null}
-        </div>
-      </aside>
-
-      {selectedNote ? (
-        <article className="panel versionEditPanel">
-        <div className="panelHeader compact">
-          <div>
-            <p className="eyebrow">Edit</p>
-            <h2>버전 노트 수정</h2>
-          </div>
-          <div className="versionHeaderActions">
-            {saveMessage ? <span>{saveMessage}</span> : null}
-            <button
-              disabled={isSavingVersionNote || isDeletingVersionNote}
-              type="button"
-              onClick={saveVersionNote}
-            >
-              {isSavingVersionNote ? '작성 중' : '작성'}
-            </button>
-            <button
-              className="versionDeleteButton"
-              disabled={isSavingVersionNote || isDeletingVersionNote}
-              type="button"
-              onClick={requestVersionNoteDeletion}
-            >
-              {isDeletingVersionNote ? (
-                  <>
-                    <LoaderCircle aria-hidden="true" className="buttonSpinner" size={18} />
-                    <span className="srOnly">삭제 중</span>
-                  </>
-                ) : (
-                  '삭제'
-                )}
-            </button>
-          </div>
-        </div>
-
-        <div className="versionForm">
-          <label>
-            버전
-            <input
-              value={selectedNote.version}
-              onChange={(event) =>
-                updateSelectedNote({ ...selectedNote, version: event.target.value })
-              }
-            />
-          </label>
-          <label>
-            업데이트 날짜
-            <input
-              value={selectedNote.releasedAt}
-              onChange={(event) =>
-                updateSelectedNote({
-                  ...selectedNote,
-                  releasedAt: event.target.value,
-                })
-              }
-            />
-          </label>
-          <div className="patchEditorHeader">
-            <h3>앱 패치 항목</h3>
-            <button type="button" onClick={addPatch}>
-              항목 추가
-            </button>
-          </div>
-
-          <div className="patchEditorList">
-            {selectedNote.patches.map((patch, index) => (
-              <div className="patchEditorItem" key={`${selectedNote.id}-${index}`}>
-                <div className="patchEditorTop">
-                  <strong>{index + 1}</strong>
-                  <button type="button" onClick={() => removePatch(index)}>
-                    삭제
-                  </button>
-                </div>
-                <label>
-                  제목
-                  <input
-                    value={patch.title}
-                    onChange={(event) => updatePatch(index, 'title', event.target.value)}
-                  />
-                </label>
-                <label>
-                  설명
-                  <textarea
-                    value={patch.description}
-                    onChange={(event) =>
-                      updatePatch(index, 'description', event.target.value)
-                    }
-                  />
-                </label>
-              </div>
-            ))}
-          </div>
-        </div>
-      </article>
-      ) : (
-        <article className="panel versionEditPanel emptyState">데이터 없음</article>
-      )}
-
-      {selectedNote ? (
-        <article className="panel appPatchPreviewPanel">
-        <div className="panelHeader compact">
-          <div>
-            <p className="eyebrow">Preview</p>
-            <h2>앱 패치노트 미리보기</h2>
-          </div>
-          <div className="previewVersionMeta">
-            <span className={`releaseTypeTag ${selectedNote.releaseType}`}>{releaseTypeLabel[selectedNote.releaseType]}</span>
-            <span>버전 {selectedNote.version}</span>
-          </div>
-        </div>
-        <div className="appPatchPreviewBody">
-          <div className="versionPreviewPhone">
-            <div className="versionPreviewSpeaker" />
-            <div className="appVersionPatchCard standalonePatchCard">
-              <div className="appNotebookBinding">
-                {[0, 1, 2, 3].map((item) => (
-                  <span key={item} />
-                ))}
-              </div>
-              <div className="appNotebookBody">
-                <div className="appPatchHeader">
-                  <div>
-                    <h3>이번 패치노트</h3>
-                    <p>{selectedNote.releasedAt} 업데이트</p>
-                  </div>
-                  <span>{selectedNote.status === 'draft' ? '미리보기' : '최신'}</span>
-                </div>
-                <div className="appPatchDivider" />
-                <div className="appPatchList">
-                  {selectedNote.patches.map((patch, index) => (
-                    <div className="appPatchRow" key={`${patch.title}-${index}`}>
-                      <div className="appPatchIcon">✓</div>
-                      <div>
-                        <strong>{patch.title}</strong>
-                        <p>{patch.description}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </article>
-      ) : (
-        <article className="panel appPatchPreviewPanel emptyState">데이터 없음</article>
-      )}
-      {savedVersionNote ? (
-        <div className="versionSaveBackdrop" role="presentation">
-          <section
-            aria-labelledby="version-save-title"
-            aria-modal="true"
-            className="versionSaveDialog"
-            role="dialog"
-          >
-            <p className="eyebrow">Saved</p>
-            <h2 id="version-save-title">버전 노트를 작성했어요</h2>
-            <p>
-              {savedVersionNote.version} · {releaseTypeLabel[savedVersionNote.releaseType]}
-            </p>
-            <button type="button" onClick={() => setSavedVersionNote(null)}>
-              확인
-            </button>
-          </section>
-        </div>
-      ) : null}
-      {notePendingDeletion ? (
-        <div className="versionSaveBackdrop" role="presentation">
-          <section
-            aria-labelledby="version-delete-title"
-            aria-modal="true"
-            className="versionSaveDialog versionDeleteDialog"
-            role="dialog"
-          >
-            <h2 id="version-delete-title">버전 노트를 삭제할까요?</h2>
-            <p>{notePendingDeletion.version} 버전 노트가 삭제됩니다.</p>
-            <div className="versionDeleteDialogActions">
-              <button
-                disabled={isDeletingVersionNote}
-                type="button"
-                onClick={() => setNotePendingDeletion(null)}
-              >
-                취소
-              </button>
-              <button
-                disabled={isDeletingVersionNote}
-                type="button"
-                onClick={deleteVersionNote}
-              >
-                {isDeletingVersionNote ? (
-                  <>
-                    <LoaderCircle aria-hidden="true" className="buttonSpinner" size={18} />
-                    <span className="srOnly">삭제 중</span>
-                  </>
-                ) : (
-                  '삭제'
-                )}
-              </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
-    </section>
-  );
-}
 type SupportPageProps = {
   inquiries: SupportInquiry[];
   onAnswerInquiry: (inquiry: SupportInquiry, answer: string) => Promise<void> | void;
@@ -3713,13 +3313,6 @@ function formatWeeklyTrend(delta: number) {
   return '지난주와 동일';
 }
 
-function formatToday() {
-  const date = new Date();
-  const pad = (input: number) => String(input).padStart(2, '0');
-
-  return `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())}`;
-}
-
 function createRestoreDatabaseId(snapshotTime: string) {
   const compactSnapshot = snapshotTime
     .replace(/[^0-9]/g, '')
@@ -3728,94 +3321,25 @@ function createRestoreDatabaseId(snapshotTime: string) {
   return `mypot-restore-${compactSnapshot || Date.now()}`;
 }
 
-function parseVersion(version: string) {
-  const [major = 0, minor = 0, patch = 0] = version
-    .split('.')
-    .map((part) => Number.parseInt(part, 10))
-    .map((part) => (Number.isFinite(part) ? part : 0));
+function formatStorageBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return '0 B';
+  }
 
-  return { major, minor, patch };
-}
-
-function compareSemanticVersion(leftVersion: string, rightVersion: string) {
-  const left = parseVersion(leftVersion);
-  const right = parseVersion(rightVersion);
-
-  return (
-    left.major - right.major ||
-    left.minor - right.minor ||
-    left.patch - right.patch
+  const units = ['B', 'KiB', 'MiB', 'GiB'];
+  const unitIndex = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1,
   );
+  const value = bytes / (1024 ** unitIndex);
+  const maximumFractionDigits = value >= 100 || unitIndex === 0 ? 0 : value >= 10 ? 1 : 2;
+
+  return `${value.toLocaleString('ko-KR', { maximumFractionDigits })} ${units[unitIndex]}`;
 }
 
-function compareVersionNotes(left: VersionNote, right: VersionNote) {
-  return compareSemanticVersion(right.version, left.version);
-}
-
-function getNextPatchVersion(notes: VersionNote[]) {
-  const latest = [...notes].sort(compareVersionNotes)[0];
-
-  if (!latest) {
-    return '1.0.0';
-  }
-
-  const version = parseVersion(latest.version);
-  return `${version.major}.${version.minor}.${version.patch + 1}`;
-}
-
-function createVersionNoteDraft(version: string, isFirstRelease: boolean): VersionNote {
-  return {
-    id: `version_${version}`,
-    version,
-    releasedAt: formatToday(),
-    summary: '새 버전 노트를 작성 중입니다.',
-    patches: [
-      {
-        title: '새 업데이트 제목',
-        description: '앱에 반영할 변경 내용을 입력해 주세요.',
-      },
-    ],
-    releaseType: isFirstRelease ? 'major' : 'patch',
-    status: 'draft',
-  };
-}
-
-function ensureVersionNoteDraft(notes: VersionNote[]) {
-  const sortedNotes = [...notes].sort(compareVersionNotes);
-  if (sortedNotes.some((note) => note.status === 'draft')) {
-    return sortedNotes;
-  }
-
-  const version = getNextPatchVersion(sortedNotes);
-  return [createVersionNoteDraft(version, sortedNotes.length === 0), ...sortedNotes];
-}
-
-function detectReleaseType(
-  version: string,
-  notes: VersionNote[],
-  currentNoteId: string,
-): VersionReleaseType {
-  const previousNote = notes
-    .filter((note) => note.id !== currentNoteId)
-    .filter((note) => compareSemanticVersion(note.version, version) < 0)
-    .sort(compareVersionNotes)[0];
-
-  if (!previousNote) {
-    return 'major';
-  }
-
-  const previous = parseVersion(previousNote.version);
-  const current = parseVersion(version);
-
-  if (current.major > previous.major) {
-    return 'major';
-  }
-
-  if (current.minor > previous.minor) {
-    return 'minor';
-  }
-
-  return 'patch';
+function formatStorageUsagePercent(percent: number) {
+  const maximumFractionDigits = percent >= 10 ? 1 : 2;
+  return `${percent.toLocaleString('ko-KR', { maximumFractionDigits })}%`;
 }
 
 function paginate<T>(items: T[], page: number) {

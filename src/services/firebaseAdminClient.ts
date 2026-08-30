@@ -26,7 +26,6 @@ import type {
   ContentReport,
   ModerationAction,
   SupportInquiry,
-  VersionNote,
 } from '../types/admin';
 
 export type DatabaseEnvironment = 'development' | 'production';
@@ -231,15 +230,6 @@ export async function resolveAdminContentReport(reportId: string, action: Modera
   return callAdminFunction<{ reportId: string; status: 'dismissed' | 'resolved' }>('resolveAdminContentReport', { action, adminNote, environment, reportId });
 }
 
-export async function loadAdminVersionNotes(
-  environment: DatabaseEnvironment = 'production',
-): Promise<VersionNote[]> {
-  const result = await callAdminFunction<{ notes: VersionNote[] }>('listAdminVersionNotes', {
-    environment,
-  });
-  return result.notes;
-}
-
 export async function loadAdminAppUpdateConfig(
   environment: DatabaseEnvironment = 'production',
 ): Promise<AppUpdateConfig> {
@@ -352,20 +342,6 @@ export async function loadPublishedMaintenanceConfig(
     'getPublishedMaintenance',
   );
   return result.config;
-}
-
-export async function saveAdminVersionNote(
-  note: VersionNote,
-  environment: DatabaseEnvironment = 'production',
-) {
-  await callAdminFunction('saveAdminVersionNote', { ...note, environment });
-}
-
-export async function deleteAdminVersionNote(
-  noteId: string,
-  environment: DatabaseEnvironment = 'production',
-) {
-  await callAdminFunction('deleteAdminVersionNote', { environment, noteId });
 }
 
 export async function loadAdminSupportInquiries(
